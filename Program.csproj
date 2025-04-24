@@ -18,6 +18,8 @@
 
         <!-- Ensure all referenced DLLs are copied to the output directory -->
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+        <!-- <PublicizeAll>true</PublicizeAll> -->
+        <NoWarn>0436</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -35,13 +37,16 @@
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
+      <PackageReference Include="Krafs.Publicizer" Version="2.0.0">
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        <PrivateAssets>all</PrivateAssets>
+      </PackageReference>
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" Culture="neutral" PublicKeyToken="null" />
     </ItemGroup>
 
-    <!-- <ItemGroup>
-      <Reference Include="Newtonsoft.Json">
-        <HintPath>$(UserProfile)\.nuget\packages\newtonsoft.json\13.0.3\lib\netstandard2.0\Newtonsoft.Json.dll</HintPath>
-      </Reference>
-    </ItemGroup> -->
+    <ItemGroup>
+        <!-- Publicize only the Haste DLLs -->
+        <Publicize Include="$(HasteDlls)" />
+    </ItemGroup>
 
 </Project>

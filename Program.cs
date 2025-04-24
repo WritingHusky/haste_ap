@@ -5,8 +5,6 @@ using Landfall.Modding;
 using UnityEngine;
 using UnityEngine.Localization;
 using Zorro.Settings;
-using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
-using UnityEngine.SceneManagement;
 
 namespace HelloWorld;
 
@@ -21,13 +19,24 @@ public class Program
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
         On.GameHandler.LoadMainMenu += StaticLoadMainMenuHook;
+        On.Landfall.Haste.MetaProgression.Unlock += StaticMetaProgressionUnlockOverloadHook;
     }
 
     private static void StaticPlayFromMenuHook(On.GameHandler.orig_PlayFromMenu orig)
     {
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
 
-        FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) => { Debug.Log($"AP ------------ Player value {value} ---------------"); });
+        FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
+        {
+            if (connection == null)
+                return;
+
+            // Never allow the value to be not what I want it to be
+            if (value != connection.shardCount)
+            {
+                FactSystem.SetFact(new Fact("current_unbeaten_shard"), connection.shardCount);
+            }
+        });
 
         SaveSystem.Save();
 
@@ -88,17 +97,17 @@ public class Program
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
+
         Debug.Log("AP Hooks Complete");
 
 
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
             Debug.Log("AP DeathLink is Enabled");
-            var deathLinkService = connection.deathLinkService!;
 
-            deathLinkService.OnDeathLinkReceived += GiveDeath;
+            connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
 
-            deathLinkService.EnableDeathLink();
+            connection.deathLinkService!.EnableDeathLink();
 
             On.Player.Die += StaticSendDeathOnDie;
 
@@ -120,7 +129,7 @@ public class Program
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
         Debug.Log("AP Player death Hooked");
-        connection!.deathLinkService!.SendDeathLink(new DeathLink(connection.username));
+        connection!.deathLinkService!.SendDeathLink(new Archipelago.MultiClient.Net.BounceFeatures.DeathLink.DeathLink(connection.username));
         orig(self);
     }
 
@@ -234,6 +243,21 @@ public class Program
         }
         connection.CompleteGame();
         orig();
+    }
+
+    private static void StaticMetaProgressionUnlockOverloadHook(On.Landfall.Haste.MetaProgression.orig_Unlock orig, AbilityKind ability)
+    {
+        if (connection == null)
+        {
+            throw new Exception("AP On Progession Unlock the connection is null");
+        }
+        var boss_location = "Ability " + Enum.GetName(typeof(AbilityKind), ability);
+        Debug.Log("AP sending Ability: (" + boss_location + ")");
+
+        // TODO add handling for numeral boss locations
+
+        connection.SendLocation(boss_location);
+        // orig();
     }
 }
 
