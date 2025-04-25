@@ -3,39 +3,36 @@ using Landfall.Haste;
 using UnityEngine.SceneManagement;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using System.Reflection;
+using Zorro.Core;
 
 namespace Integration
 {
   public static class Integration
   {
-    private static bool _enabled = false;
-
-    private static int _shardCount = -1;
 
     public static APConnection.Connection? connection;
 
-    public static void UpdateShardCount(int count)
+    public static void UpdateShardCount()
     {
+      var _shardCount = connection!.GetItemCount("Progressive Shard");
       Debug.Log("AP unlocked to shard: " + _shardCount);
-      _shardCount = count;
       // Change the connection data first as this value is checked on factsystem update
-      connection!.UpdateDataShardCount(_shardCount);
       PlayerProgress.UnlockToShard(_shardCount);
       SaveSystem.Save();
     }
 
     public static void GiveItem(string itemName)
     {
-      // TODO Figure out why debug not printing here
       Debug.Log("AP Trying to give (" + itemName + ")");
-      // Debug.Assert(_enabled, "Should not try to give item when AP is disabled");
-      // Implementation here
+      ApDebugLog.Instance.DisplayMessage($"Giving item: {itemName}");
+
       switch (itemName)
       {
         case "Progressive Shard":
           Debug.Log("AP Got a Shard!");
+          ApDebugLog.Instance.DisplayMessage("Got Shard");
           // Increase the number of shards that the player can use
-          UpdateShardCount(_shardCount + 1);
+          UpdateShardCount();
           if (GM_Hub.isInHub && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
           {
             Debug.Log("AP Forcing a Reload");
@@ -45,41 +42,62 @@ namespace Integration
         case "Shard Shop Filler Item":
           // This is a filler item for now
           Debug.Log("AP Got a filler item");
+          ApDebugLog.Instance.DisplayMessage("Got Filler");
           break;
         case "Slomo":
           Debug.Log("AP Got Abilty Slomo");
-          FactSystem.SetFact(new Fact("ability_slomo_unlocked"), 1f);
+          ApDebugLog.Instance.DisplayMessage("Got Slomo");
+          FactSystem.SetFact(MetaProgression.SlomoUnlocked, 1f);
+          MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
+          SaveSystem.Save();
           break;
         case "Grapple":
           Debug.Log("AP Got Abilty Grapple");
-          FactSystem.SetFact(new Fact("ability_grapple_unlocked"), 1f);
+          ApDebugLog.Instance.DisplayMessage("Got Grapple");
+          FactSystem.SetFact(MetaProgression.GrappleUnlocked, 1f);
+          MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
+          SaveSystem.Save();
           break;
         case "Fly":
           Debug.Log("AP Got Abilty Fly");
-          FactSystem.SetFact(new Fact("ability_fly_unlocked"), 1f);
+          ApDebugLog.Instance.DisplayMessage("Got Fly");
+          FactSystem.SetFact(MetaProgression.FlyUnlocked, 1f);
+          MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
+          SaveSystem.Save();
           break;
         case "Anti-Spark 100 bundle":
           Debug.Log("AP Got Anti-Spark 100 bundle");
+          ApDebugLog.Instance.DisplayMessage("Got Anti-spark 100");
           FactSystem.AddToFact(new Fact("meta_progression_resource"), 100f);
           break;
         case "Anti-Spark 250 bundle":
           Debug.Log("AP Got Anti-Spark 250 bundle");
+          ApDebugLog.Instance.DisplayMessage("Got Anti-spark 250");
           FactSystem.AddToFact(new Fact("meta_progression_resource"), 250f);
           break;
         case "Anti-Spark 500 bundle":
           Debug.Log("AP Got Anti-Spark 500 bundle");
+          ApDebugLog.Instance.DisplayMessage("Got Anti-spark 500");
           FactSystem.AddToFact(new Fact("meta_progression_resource"), 500f);
           break;
         default:
-          throw new NotImplementedException("Item :" + itemName + " has no handling");
+          Debug.LogError("Item :" + itemName + " has no handling");
+          ApDebugLog.Instance.DisplayMessage($"Item {itemName} has no handling");
+          break;
       }
       SaveSystem.Save();
+    }
+
+    public static void AbilityTutorial()
+    {
+      Singleton<TutorialPopUpHandler>.Instance.TriggerPopUp(TutorialType.Abilities);
     }
 
     public static void GiveDeath(DeathLink death)
     {
       // TODO Figure out why debug not printing here
       Debug.Log("AP DeathLink recieved");
+      ApDebugLog.Instance.DisplayMessage("Death Recieved");
       var cause = "Unkown";
       if (death.Cause != null)
       {

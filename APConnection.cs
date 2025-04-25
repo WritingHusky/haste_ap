@@ -1,6 +1,7 @@
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
+using Landfall.Haste;
 using pworld.Scripts.Extensions;
 using UnityEngine;
 using UnityEngine.Purchasing.MiniJSON;
@@ -15,13 +16,11 @@ public class Connection(string hostname, int port)
   public string dataTag = "Haste";
   public ArchipelagoSession session = ArchipelagoSessionFactory.CreateSession(hostname, port);
 
-  public int shardCount = -1;
-
   public string username = "";
 
   public DeathLinkService? deathLinkService;
 
-  public void Connect(string user = "Player1", string? pass = null)
+  public bool Connect(string user = "Player1", string? pass = null)
   {
     username = user;
     LoginResult result;
@@ -52,7 +51,7 @@ public class Connection(string hostname, int port)
       }
       Debug.Log("AP Connection failed");
       Debug.LogError(errorMessage);
-      return; // Did not connect, show the user the contents of `errorMessage`
+      return false; // Did not connect, show the user the contents of `errorMessage`
       // TODO Add display message to signal a failure
     }
 
@@ -67,7 +66,7 @@ public class Connection(string hostname, int port)
     if (loginSuccess.SlotData.TryGetValue("DeathLink", out Deathlink))
     {
       Debug.Log($"AP found DeathLink in slot data with value: {Deathlink}");
-      Landfall.Haste.FactSystem.SetFact(new Landfall.Haste.Fact("APDeathlink"), Convert.ToSingle(Deathlink));
+      FactSystem.SetFact(new Fact("APDeathlink"), Convert.ToSingle(Deathlink));
     }
     else
     {
@@ -80,7 +79,7 @@ public class Connection(string hostname, int port)
     if (loginSuccess.SlotData.TryGetValue("ForceReload", out ForceReload))
     {
       Debug.Log($"AP found ForceReload in slot data with value: {ForceReload}");
-      Landfall.Haste.FactSystem.SetFact(new Landfall.Haste.Fact("APForceReload"), Convert.ToSingle(ForceReload));
+      FactSystem.SetFact(new Fact("APForceReload"), Convert.ToSingle(ForceReload));
     }
     else
     {
@@ -88,19 +87,15 @@ public class Connection(string hostname, int port)
       // Might default the value here to make things consistant
     }
 
-    SaveSystem.Save();
+    // SaveSystem.Save();
 
-    // Try to get the current progression from the server
-    session.DataStorage[dataTag + "Shard_Count"].DoIfNotNull(() =>
-    {
-      shardCount = session.DataStorage[dataTag + "Shard_Count"];
-      Debug.Log($"AP Found Shard_Count in datastore: {shardCount}");
-    });
+    return true;
   }
 
   public void SendLocation(string locationName)
   {
     Debug.Log($"AP Sending location {locationName}");
+    ApDebugLog.Instance.DisplayMessage($"Sending location {locationName}");
     long locationID = session.Locations.GetLocationIdFromName(game, locationName);
     if (locationID != -1)
     {
@@ -123,19 +118,30 @@ public class Connection(string hostname, int port)
   {
 
     Debug.Log("AP Building Item Reiever");
+    ApDebugLog.Instance.DisplayMessage($"Built item reciever");
 
     session.Items.ItemReceived += (receivedItemsHelper) =>
-        {
-          Debug.Log("AP Item recieved trigger");
-          var itemReceivedInfo = receivedItemsHelper.PeekItem();
-          itemReceivedInfo.DoIfNotNull(() =>
-          {
-            Debug.Log($"AP Atempting to give {itemReceivedInfo.ItemName}");
-            GiveItem(itemReceivedInfo.ItemName);
-          });
+    {
+      try
+      {
 
-          receivedItemsHelper.DequeueItem();
-        };
+        Debug.Log("AP Item recieved trigger");
+        ApDebugLog.Instance.DisplayMessage("Item Recieved");
+        var itemReceivedInfo = receivedItemsHelper.PeekItem();
+        // itemReceivedInfo.DoIfNotNull(() =>
+        // {
+        Debug.Log($"AP Atempting to give {itemReceivedInfo.ItemName}");
+        ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName}");
+        GiveItem(itemReceivedInfo.ItemName);
+        // });
+
+        receivedItemsHelper.DequeueItem();
+      }
+      catch (Exception e)
+      {
+        ApDebugLog.Instance.DisplayMessage($"Error in giving an item {e.Message}");
+      }
+    };
   }
 
   public void CompleteGame()
@@ -144,9 +150,14 @@ public class Connection(string hostname, int port)
     session.SetGoalAchieved();
   }
 
-  public void UpdateDataShardCount(int count)
+  public int GetItemCount(string item_name)
   {
-    shardCount = count;
-    session.DataStorage[dataTag + "Shard_Count"] = count;
+    var count = 0;
+    foreach (var item in session.Items.AllItemsReceived)
+    {
+      if (item.ItemName == item_name)
+        count++;
+    }
+    return count;
   }
 }

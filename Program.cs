@@ -5,45 +5,41 @@ using Landfall.Modding;
 using UnityEngine;
 using UnityEngine.Localization;
 using Zorro.Settings;
-
-namespace HelloWorld;
+using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
+using System.Reflection;
 
 [LandfallPlugin]
 public class Program
 {
     private static Connection? connection;
+
     static Program()
     {
         Debug.Log("AP Program launched");
 
+        GameObject instance = new(nameof(ApDebugLog));
+        UnityEngine.Object.DontDestroyOnLoad(instance);
+        instance.AddComponent<ApDebugLog>();
+
+        Debug.Log("AP Log created");
+        ApDebugLog.Instance.DisplayMessage("Archiplego Installed");
+
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
         On.GameHandler.LoadMainMenu += StaticLoadMainMenuHook;
-        On.Landfall.Haste.MetaProgression.Unlock += StaticMetaProgressionUnlockOverloadHook;
+
+
     }
 
     private static void StaticPlayFromMenuHook(On.GameHandler.orig_PlayFromMenu orig)
     {
-        FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
 
-        FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
-        {
-            if (connection == null)
-                return;
-
-            // Never allow the value to be not what I want it to be
-            if (value != connection.shardCount)
-            {
-                FactSystem.SetFact(new Fact("current_unbeaten_shard"), connection.shardCount);
-            }
-        });
-
-        SaveSystem.Save();
 
         if (connection != null)
         {
             Debug.LogError("AP Play button clicked and connection is not null");
         }
+        ApDebugLog.Instance.DisplayMessage("Begining Build");
 
         var settingsHandler = GameHandler.Instance.SettingsHandler;
         var enabledSetting = settingsHandler.GetSetting<ApEnabledSetting>().Value;
@@ -51,8 +47,10 @@ public class Program
         if (!enabledSetting)
         {
             Debug.Log("AP not started as it was disabled");
+            ApDebugLog.Instance.DisplayMessage("AP Disabled");
 
             Debug.Log("AP Transitioning to original actions");
+            FactSystem.SetFact(new Fact("APFisrtLoad"), 1f);
             orig();
             return;
         }
@@ -69,18 +67,77 @@ public class Program
         }
 
         connection = new(serverName, serverPort);
-        connection.Connect(username, password);
+
+        // This must go BEFORE connection
+        connection.BuildItemReciver(GiveItem);
+
+        if (!connection.Connect(username, password))
+        {
+            ApDebugLog.Instance.DisplayMessage("Connection Failed");
+            return;
+        }
+        ApDebugLog.Instance.DisplayMessage("Connected");
 
         Integration.Integration.connection = connection;
 
+        FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
+        SetDefeaultState();
 
-        // Setup default savestate
+        FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
+        {
+            ApDebugLog.Instance.DisplayMessage($"unbeaten shard update to (zero index){value}");
+            if (connection == null)
+                return;
 
-        // Add AP Server Connection based actions
+            var shard_count = connection.GetItemCount("Progressive Shard");
+            // Never allow the value to be not what I want it to be
+            if (value != shard_count)
+            {
+                FactSystem.SetFact(new Fact("current_unbeaten_shard"), shard_count);
+            }
+        });
 
-        // Connects the onItemRecive to the Give item
-        // This will happen for every item including  
-        connection.BuildItemReciver(GiveItem);
+        SaveSystem.Save();
+
+        // Only add the hooks on first load
+        if (FactSystem.GetFact(new Fact("APFisrtLoad")) == 1f)
+        {
+            // Need to add the deathlink to connection still if first load
+            if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
+            {
+                ApDebugLog.Instance.DisplayMessage("Deathlink Enabled");
+                connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
+
+                connection.deathLinkService!.EnableDeathLink();
+
+            }
+
+            // Move on
+            ApDebugLog.Instance.DisplayMessage("Loaded again");
+
+            orig();
+            return;
+        }
+
+        if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
+        {
+            Debug.Log("AP DeathLink is Enabled");
+            ApDebugLog.Instance.DisplayMessage("Deathlink Enabled");
+
+            connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
+
+            connection.deathLinkService!.EnableDeathLink();
+
+            On.Player.Die += StaticSendDeathOnDie;
+
+            Debug.Log("AP DeathLink Hooked");
+        }
+        else
+        {
+            Debug.Log("AP Deathlink is Disabled");
+        }
+
+
 
         // Add Game base Actions
         Debug.Log("AP Creating Hooks");
@@ -97,31 +154,17 @@ public class Program
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
+        On.Landfall.Haste.AbilityUnlockScreen.Unlock += StaticMetaProgressionUnlockOverloadHook;
+
 
         Debug.Log("AP Hooks Complete");
-
-
-        if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
-        {
-            Debug.Log("AP DeathLink is Enabled");
-
-            connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
-
-            connection.deathLinkService!.EnableDeathLink();
-
-            On.Player.Die += StaticSendDeathOnDie;
-
-            Debug.Log("AP DeathLink Hooked");
-        }
-        else
-        {
-            Debug.Log("AP Deathlink is Disabled");
-        }
 
         // Once the player starts in game do the loading as somethings are not setup yet
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
 
+        FactSystem.SetFact(new Fact("APFisrtLoad"), 1f);
         Debug.Log("AP Transitioning to original actions");
+        ApDebugLog.Instance.DisplayMessage("Loading normaly now");
         orig();
     }
 
@@ -129,7 +172,8 @@ public class Program
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
         Debug.Log("AP Player death Hooked");
-        connection!.deathLinkService!.SendDeathLink(new Archipelago.MultiClient.Net.BounceFeatures.DeathLink.DeathLink(connection.username));
+        ApDebugLog.Instance.DisplayMessage("Death Link sent");
+        connection!.deathLinkService!.SendDeathLink(new DeathLink(connection.username));
         orig(self);
     }
 
@@ -148,15 +192,14 @@ public class Program
     private static void StaticLoadHubHook(On.GM_API.orig_OnSpawnedInHub orig)
     {
         Debug.Log("AP Loading into Hub");
+        ApDebugLog.Instance.DisplayMessage("Loaded into hub");
 
-        UpdateShardCount(connection!.shardCount);
+        UpdateShardCount();
 
         // Only do these on the first load of the game
         if (FactSystem.GetFact(new Fact("APForceReloadFirstLoad")) == 0f)
         {
             FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 1f);
-
-            SetDefeaultState();
 
             SaveSystem.Save();
         }
@@ -173,7 +216,7 @@ public class Program
         {
             connection.Close();
             connection = null;
-
+            ApDebugLog.Instance.DisplayMessage("Removed connection");
             FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         }
 
@@ -187,10 +230,11 @@ public class Program
     {
         if (connection == null)
         {
-            throw new Exception("AP On Complete Run the connection is null");
+            ApDebugLog.Instance.DisplayMessage("AP On Complete Run the connection is null");
+            return;
         }
-
-        PlayerProgress.SetShardComplete(0);
+        ApDebugLog.Instance.DisplayMessage("Run Complete");
+        UpdateShardCount();
     }
 
     /// <summary>
@@ -200,12 +244,13 @@ public class Program
     {
         if (connection == null)
         {
-            throw new Exception("AP On Get Item the connection is null");
+            ApDebugLog.Instance.DisplayMessage("AP On Get Item the connection is null");
+            return;
         }
         var currentShard = RunHandler.RunData.shardID;
         var item_location = "Shard " + currentShard + " Shop Item";
         Debug.Log("AP sending Item: (" + item_location + ")");
-
+        ApDebugLog.Instance.DisplayMessage("Bought Item");
         // TODO add handling for numeral item locations
 
         connection.SendLocation(item_location);
@@ -220,11 +265,13 @@ public class Program
     {
         if (connection == null)
         {
-            throw new Exception("AP On Boss Death the connection is null");
+            ApDebugLog.Instance.DisplayMessage("AP On Boss Death the connection is null");
+            return;
         }
         var currentShard = RunHandler.RunData.shardID;
         var boss_location = "Shard " + currentShard + " Boss";
         Debug.Log("AP sending Boss: (" + boss_location + ")");
+        ApDebugLog.Instance.DisplayMessage("Boss Defeated");
 
         // TODO add handling for numeral boss locations
 
@@ -239,24 +286,43 @@ public class Program
     {
         if (connection == null)
         {
-            throw new Exception("AP On End Boss Win the connection is null");
+            ApDebugLog.Instance.DisplayMessage("AP On End Boss Win the connection is null");
+            return;
         }
+        ApDebugLog.Instance.DisplayMessage("Game Complete");
         connection.CompleteGame();
         orig();
     }
 
-    private static void StaticMetaProgressionUnlockOverloadHook(On.Landfall.Haste.MetaProgression.orig_Unlock orig, AbilityKind ability)
+    private static void StaticMetaProgressionUnlockOverloadHook(On.Landfall.Haste.AbilityUnlockScreen.orig_Unlock orig, AbilityUnlockScreen self)
     {
+        // Get the type of the AbilityUnlockScreen
+        Type unlockScreenType = typeof(AbilityUnlockScreen);
+
+        // Use reflection to get the private field "Character"
+        FieldInfo characterField = unlockScreenType.GetField("Character", BindingFlags.NonPublic | BindingFlags.Instance);
+
         if (connection == null)
         {
-            throw new Exception("AP On Progession Unlock the connection is null");
+            ApDebugLog.Instance.DisplayMessage("AP On Progession Unlock the connection is null");
+            return;
         }
-        var boss_location = "Ability " + Enum.GetName(typeof(AbilityKind), ability);
-        Debug.Log("AP sending Ability: (" + boss_location + ")");
+
+        // Get the value of the "Character" field from the unlockScreen instance
+        var interactionCharacter = characterField.GetValue(self) as InteractionCharacter;
+        if (interactionCharacter == null)
+        {
+            ApDebugLog.Instance.DisplayMessage("The 'Character' field is null or not of type InteractionCharacter.");
+            return;
+        }
+        var ability_name = Enum.GetName(typeof(AbilityKind), interactionCharacter.Ability);
+        var ability_location = $"Ability {ability_name}";
+        Debug.Log("AP sending Ability: (" + ability_location + ")");
+        ApDebugLog.Instance.DisplayMessage($"Ability Got: {ability_name}");
 
         // TODO add handling for numeral boss locations
 
-        connection.SendLocation(boss_location);
+        connection.SendLocation(ability_location);
         // orig();
     }
 }
