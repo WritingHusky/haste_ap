@@ -110,7 +110,7 @@ public class Connection(string hostname, int port)
   public void Close()
   {
     Debug.Log("AP Disconnecting");
-    session.Socket.DisconnectAsync().Wait();
+    session.Socket.DisconnectAsync();
     Debug.Log("AP Disconnected");
   }
 
