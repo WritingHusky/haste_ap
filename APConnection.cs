@@ -128,12 +128,16 @@ public class Connection(string hostname, int port)
         Debug.Log("AP Item recieved trigger");
         ApDebugLog.Instance.DisplayMessage("Item Recieved");
         var itemReceivedInfo = receivedItemsHelper.PeekItem();
-        // itemReceivedInfo.DoIfNotNull(() =>
-        // {
-        Debug.Log($"AP Atempting to give {itemReceivedInfo.ItemName}");
-        ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName}");
-        GiveItem(itemReceivedInfo.ItemName);
-        // });
+
+        if (receivedItemsHelper.Index > FactSystem.GetFact(new Fact("APExpectedIndex")))
+        {
+          Debug.Log($"AP Atempting to give {itemReceivedInfo.ItemName}");
+          ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} with index {receivedItemsHelper.Index}");
+          GiveItem(itemReceivedInfo.ItemName);
+          FactSystem.SetFact(new Fact("APExpectedIndex"), (float)receivedItemsHelper.Index);
+          SaveSystem.Save();
+        }
+
 
         receivedItemsHelper.DequeueItem();
       }
