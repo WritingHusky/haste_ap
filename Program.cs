@@ -9,25 +9,24 @@ using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using System.Reflection;
 
 [LandfallPlugin]
-public class Program
+public partial class Program
 {
     private static Connection? connection;
 
     static Program()
     {
-        Debug.Log("AP Program launched");
+        UnityMainThreadDispatcher.Instance().log("AP Program launched");
 
         GameObject instance = new(nameof(ApDebugLog));
         UnityEngine.Object.DontDestroyOnLoad(instance);
         instance.AddComponent<ApDebugLog>();
 
-        Debug.Log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage("Archiplego Installed");
+        UnityMainThreadDispatcher.Instance().log("AP Log created");
+        ApDebugLog.Instance.DisplayMessage("Archiplego Installed", isDebug: false);
 
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
         On.GameHandler.LoadMainMenu += StaticLoadMainMenuHook;
-
 
     }
 
@@ -37,7 +36,7 @@ public class Program
 
         if (connection != null)
         {
-            Debug.LogError("AP Play button clicked and connection is not null");
+            UnityMainThreadDispatcher.Instance().logError("AP Play button clicked and connection is not null");
         }
         ApDebugLog.Instance.DisplayMessage("Begining Build");
 
@@ -46,16 +45,16 @@ public class Program
 
         if (!enabledSetting)
         {
-            Debug.Log("AP not started as it was disabled");
+            UnityMainThreadDispatcher.Instance().log("AP not started as it was disabled");
             ApDebugLog.Instance.DisplayMessage("AP Disabled");
 
-            Debug.Log("AP Transitioning to original actions");
+            UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
             FactSystem.SetFact(new Fact("APFisrtLoad"), 1f);
             orig();
             return;
         }
 
-        Debug.Log("AP enabled so begining startup");
+        UnityMainThreadDispatcher.Instance().log("AP enabled so begining startup");
         var serverName = settingsHandler.GetSetting<ApServerNameSetting>().Value;
         var serverPort = settingsHandler.GetSetting<ApServerPortSetting>().Value;
         var username = settingsHandler.GetSetting<ApUsernameSetting>().Value;
@@ -70,6 +69,7 @@ public class Program
 
         // This must go BEFORE connection
         connection.BuildItemReciver(GiveItem);
+        connection.buildMessageReciver();
 
         if (!connection.Connect(username, password))
         {
@@ -121,7 +121,7 @@ public class Program
 
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
-            Debug.Log("AP DeathLink is Enabled");
+            UnityMainThreadDispatcher.Instance().log("AP DeathLink is Enabled");
             ApDebugLog.Instance.DisplayMessage("Deathlink Enabled");
 
             connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
@@ -130,17 +130,17 @@ public class Program
 
             On.Player.Die += StaticSendDeathOnDie;
 
-            Debug.Log("AP DeathLink Hooked");
+            UnityMainThreadDispatcher.Instance().log("AP DeathLink Hooked");
         }
         else
         {
-            Debug.Log("AP Deathlink is Disabled");
+            UnityMainThreadDispatcher.Instance().log("AP Deathlink is Disabled");
         }
 
 
 
         // Add Game base Actions
-        Debug.Log("AP Creating Hooks");
+        UnityMainThreadDispatcher.Instance().log("AP Creating Hooks");
 
         // Override the handling of completing of a run to 
         On.GM_API.OnRunEnd += StaticCompleteRunHook;
@@ -155,15 +155,16 @@ public class Program
         On.SaveSystem.Load += StaticSaveLoadHook;
 
         On.Landfall.Haste.AbilityUnlockScreen.Unlock += StaticMetaProgressionUnlockOverloadHook;
+        On.InteractableCharacter.Start += StaticInteractableCharacterStartHook;
 
 
-        Debug.Log("AP Hooks Complete");
+        UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
 
         // Once the player starts in game do the loading as somethings are not setup yet
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
 
         FactSystem.SetFact(new Fact("APFisrtLoad"), 1f);
-        Debug.Log("AP Transitioning to original actions");
+        UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
         ApDebugLog.Instance.DisplayMessage("Loading normaly now");
         orig();
     }
@@ -171,7 +172,7 @@ public class Program
 
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
-        Debug.Log("AP Player death Hooked");
+        UnityMainThreadDispatcher.Instance().log("AP Player death Hooked");
         ApDebugLog.Instance.DisplayMessage("Death Link sent");
         connection!.deathLinkService!.SendDeathLink(new DeathLink(connection.username));
         orig(self);
@@ -191,7 +192,7 @@ public class Program
     /// </summary>
     private static void StaticLoadHubHook(On.GM_API.orig_OnSpawnedInHub orig)
     {
-        Debug.Log("AP Loading into Hub");
+        UnityMainThreadDispatcher.Instance().log("AP Loading into Hub");
         ApDebugLog.Instance.DisplayMessage("Loaded into hub");
 
         UpdateShardCount();
@@ -247,9 +248,9 @@ public class Program
             ApDebugLog.Instance.DisplayMessage("AP On Get Item the connection is null");
             return;
         }
-        var currentShard = RunHandler.RunData.shardID;
+        var currentShard = RunHandler.RunData.shardID + 1;
         var item_location = "Shard " + currentShard + " Shop Item";
-        Debug.Log("AP sending Item: (" + item_location + ")");
+        UnityMainThreadDispatcher.Instance().log("AP sending Item: (" + item_location + ")");
         ApDebugLog.Instance.DisplayMessage("Bought Item");
         // TODO add handling for numeral item locations
 
@@ -268,9 +269,9 @@ public class Program
             ApDebugLog.Instance.DisplayMessage("AP On Boss Death the connection is null");
             return;
         }
-        var currentShard = RunHandler.RunData.shardID;
+        var currentShard = RunHandler.RunData.shardID + 1;
         var boss_location = "Shard " + currentShard + " Boss";
-        Debug.Log("AP sending Boss: (" + boss_location + ")");
+        UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");
         ApDebugLog.Instance.DisplayMessage("Boss Defeated");
 
         // TODO add handling for numeral boss locations
@@ -317,13 +318,45 @@ public class Program
         }
         var ability_name = Enum.GetName(typeof(AbilityKind), interactionCharacter.Ability);
         var ability_location = $"Ability {ability_name}";
-        Debug.Log("AP sending Ability: (" + ability_location + ")");
+        UnityMainThreadDispatcher.Instance().log("AP sending Ability: (" + ability_location + ")");
         ApDebugLog.Instance.DisplayMessage($"Ability Got: {ability_name}");
-
+        var cost = MetaProgression.Instance.GetEntry(interactionCharacter.Ability).cost;
+        MetaProgression.AddResource(-cost);
         // TODO add handling for numeral boss locations
 
         connection.SendLocation(ability_location);
         // orig();
+        // Close the window
+
+        self.gameObject.SetActive(value: false);
+    }
+
+    private static void StaticInteractableCharacterStartHook(On.InteractableCharacter.orig_Start orig, InteractableCharacter self)
+    {
+        Type interactableCharacterType = self.GetType();
+        FieldInfo initField = interactableCharacterType.GetField("init", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        var ability = self.character.Ability;
+        var abilityName = Enum.GetName(typeof(AbilityKind), ability);
+
+        if (initField.GetValue(self) is not bool init)
+        {
+            ApDebugLog.Instance.DisplayMessage("The 'Character' field is null or not of type InteractionCharacter.");
+            return;
+        }
+
+        if (!init)
+        {
+            if (self.interactionToPlay != null)
+            {
+                self.State.SwitchState<InteractableCharacter.HasInteractionState>();
+            }
+            // If the character has an unlock interaction and The ability location is not unlocked
+            else if (self.unlockInteraction != null && !connection!.IsLocationChecked($"Ability {abilityName}"))
+            {
+                self.State.SwitchState<InteractableCharacter.HasAbilityUnlockState>();
+            }
+        }
     }
 }
 
@@ -337,43 +370,56 @@ public class ApEnabledSetting : BoolSetting, IExposedSetting
 
     public override LocalizedString OnString => new UnlocalizedString("AP on");
 
-    public override void ApplyValue() => Debug.Log($"AP Toggled AP to {Value}");
+    public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"AP Toggled AP to {Value}");
     protected override bool GetDefaultValue() => false;
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Toggle");
-    public string GetCategory() => SettingCategory.General;
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApDebugEnabledSetting : BoolSetting, IExposedSetting
+{
+    public override LocalizedString OffString => new UnlocalizedString("Debug messages off");
+
+    public override LocalizedString OnString => new UnlocalizedString("Debug messages on");
+
+    public override void ApplyValue() => FactSystem.SetFact(new Fact("APDebugLogEnabled"), Value ? 1f : 0f);
+    protected override bool GetDefaultValue() => false;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Debug Toggle");
+    public string GetCategory() => "AP";
 }
 
 [HasteSetting]
 public class ApServerNameSetting : StringSetting, IExposedSetting
 {
-    public override void ApplyValue() => Debug.Log($"New AP hostname {Value}");
+    public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"New AP hostname {Value}");
     protected override string GetDefaultValue() => "localhost";
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Server name");
-    public string GetCategory() => SettingCategory.General;
+    public string GetCategory() => "AP";
 }
 
 [HasteSetting]
 public class ApServerPortSetting : IntSetting, IExposedSetting
 {
-    public override void ApplyValue() => Debug.Log($"New AP hostport {Value}");
+    public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"New AP hostport {Value}");
     protected override int GetDefaultValue() => 38281;
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Server Port");
-    public string GetCategory() => SettingCategory.General;
+    public string GetCategory() => "AP";
 }
 
 [HasteSetting]
 public class ApUsernameSetting : StringSetting, IExposedSetting
 {
-    public override void ApplyValue() => Debug.Log($"New AP username {Value}");
+    public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"New AP username {Value}");
     protected override string GetDefaultValue() => "Player1";
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Username");
-    public string GetCategory() => SettingCategory.General;
+    public string GetCategory() => "AP";
 }
 [HasteSetting]
 public class ApPasswordSetting : StringSetting, IExposedSetting
 {
-    public override void ApplyValue() => Debug.Log($"New AP Password {Value}");
+    public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"New AP Password {Value}");
     protected override string GetDefaultValue() => "";
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Password");
-    public string GetCategory() => SettingCategory.General;
+    public string GetCategory() => "AP";
 }

@@ -1,6 +1,5 @@
-/// <summary>
-/// Enum of available alignment modes
-/// </summary>
+// Inspired / based of the In Game Stats Mod by Qwarks
+
 public enum AlignmentMode
 {
   Left,
@@ -8,36 +7,24 @@ public enum AlignmentMode
   Right,
 }
 
-/// <summary>
-/// Enum of available colorized modes
-/// </summary>
 public enum ColorizedMode
 {
   None,
   Colorized,
 }
 
-/// <summary>
-/// Enum of available font modes
-/// </summary>
 public enum FontMode
 {
   None,
   GameFont,
 }
 
-/// <summary>
-/// Enum of available outline modes
-/// </summary>
 public enum OutlineMode
 {
   None,
   Outline,
 }
 
-/// <summary>
-/// Enum of available display modes
-/// </summary>
 public enum DisplayMode
 {
   None,

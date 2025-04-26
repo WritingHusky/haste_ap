@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 public class UnityMainThreadDispatcher : MonoBehaviour
@@ -36,5 +34,20 @@ public class UnityMainThreadDispatcher : MonoBehaviour
         _executionQueue.Dequeue().Invoke();
       }
     }
+  }
+
+  public void log(string message)
+  {
+    Enqueue(() =>
+   {
+     Debug.Log(message);
+   });
+  }
+  public void logError(string message)
+  {
+    Enqueue(() =>
+   {
+     Debug.LogError(message);
+   });
   }
 }

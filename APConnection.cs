@@ -2,8 +2,6 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
 using Landfall.Haste;
-using pworld.Scripts.Extensions;
-using UnityEngine;
 using UnityEngine.Purchasing.MiniJSON;
 
 namespace APConnection;
@@ -11,7 +9,7 @@ namespace APConnection;
 public class Connection(string hostname, int port)
 {
   private string server = hostname + port.ToString();
-  private string game = "Haste";
+  public string game = "Haste";
 
   public string dataTag = "Haste";
   public ArchipelagoSession session = ArchipelagoSessionFactory.CreateSession(hostname, port);
@@ -26,7 +24,7 @@ public class Connection(string hostname, int port)
     LoginResult result;
     try
     {
-      Debug.Log("AP Attempting to connect");
+      UnityMainThreadDispatcher.Instance().log("AP Attempting to connect");
       // handle TryConnectAndLogin attempt here and save the returned object to `result`
       result = session.TryConnectAndLogin(game, user, ItemsHandlingFlags.AllItems, password: pass);
 
@@ -49,15 +47,15 @@ public class Connection(string hostname, int port)
       {
         errorMessage += $"\n    {error}";
       }
-      Debug.Log("AP Connection failed");
-      Debug.LogError(errorMessage);
+      UnityMainThreadDispatcher.Instance().log("AP Connection failed");
+      UnityMainThreadDispatcher.Instance().logError(errorMessage);
       return false; // Did not connect, show the user the contents of `errorMessage`
       // TODO Add display message to signal a failure
     }
 
     // Successfully connected, `ArchipelagoSession` (assume statically defined as `session` from now on) can now be used to interact with the server and the returned `LoginSuccessful` contains some useful information about the initial connection (e.g. a copy of the slot data as `loginSuccess.SlotData`)
     var loginSuccess = (LoginSuccessful)result;
-    Debug.Log("AP Connection Succeded");
+    UnityMainThreadDispatcher.Instance().log("AP Connection Succeded");
 
     dataTag = $"Haste_{loginSuccess.Team}_{loginSuccess.Slot}_";
 
@@ -65,12 +63,12 @@ public class Connection(string hostname, int port)
     object Deathlink;
     if (loginSuccess.SlotData.TryGetValue("DeathLink", out Deathlink))
     {
-      Debug.Log($"AP found DeathLink in slot data with value: {Deathlink}");
+      UnityMainThreadDispatcher.Instance().log($"AP found DeathLink in slot data with value: {Deathlink}");
       FactSystem.SetFact(new Fact("APDeathlink"), Convert.ToSingle(Deathlink));
     }
     else
     {
-      Debug.Log("AP Failed to get Deathlink from slot data:" + loginSuccess.SlotData.toJson());
+      UnityMainThreadDispatcher.Instance().log("AP Failed to get Deathlink from slot data:" + loginSuccess.SlotData.toJson());
       // Might default the value here to make things consistant
     }
     deathLinkService = session.CreateDeathLinkService();
@@ -78,12 +76,12 @@ public class Connection(string hostname, int port)
     object ForceReload;
     if (loginSuccess.SlotData.TryGetValue("ForceReload", out ForceReload))
     {
-      Debug.Log($"AP found ForceReload in slot data with value: {ForceReload}");
+      UnityMainThreadDispatcher.Instance().log($"AP found ForceReload in slot data with value: {ForceReload}");
       FactSystem.SetFact(new Fact("APForceReload"), Convert.ToSingle(ForceReload));
     }
     else
     {
-      Debug.Log("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
+      UnityMainThreadDispatcher.Instance().log("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
       // Might default the value here to make things consistant
     }
 
@@ -94,7 +92,7 @@ public class Connection(string hostname, int port)
 
   public void SendLocation(string locationName)
   {
-    Debug.Log($"AP Sending location {locationName}");
+    UnityMainThreadDispatcher.Instance().log($"AP Sending location {locationName}");
     ApDebugLog.Instance.DisplayMessage($"Sending location {locationName}");
     long locationID = session.Locations.GetLocationIdFromName(game, locationName);
     if (locationID != -1)
@@ -103,21 +101,21 @@ public class Connection(string hostname, int port)
     }
     else
     {
-      Debug.LogError($"AP No locationID for name: {locationName}");
+      UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
     }
   }
 
   public void Close()
   {
-    Debug.Log("AP Disconnecting");
+    UnityMainThreadDispatcher.Instance().log("AP Disconnecting");
     session.Socket.DisconnectAsync();
-    Debug.Log("AP Disconnected");
+    UnityMainThreadDispatcher.Instance().log("AP Disconnected");
   }
 
   public void BuildItemReciver(Action<string> GiveItem)
   {
 
-    Debug.Log("AP Building Item Reiever");
+    UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
     ApDebugLog.Instance.DisplayMessage($"Built item reciever");
 
     session.Items.ItemReceived += (receivedItemsHelper) =>
@@ -125,32 +123,52 @@ public class Connection(string hostname, int port)
       try
       {
 
-        Debug.Log("AP Item recieved trigger");
+        UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
         ApDebugLog.Instance.DisplayMessage("Item Recieved");
-        var itemReceivedInfo = receivedItemsHelper.PeekItem();
-
-        if (receivedItemsHelper.Index > FactSystem.GetFact(new Fact("APExpectedIndex")))
-        {
-          Debug.Log($"AP Atempting to give {itemReceivedInfo.ItemName}");
-          ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} with index {receivedItemsHelper.Index}");
-          GiveItem(itemReceivedInfo.ItemName);
-          FactSystem.SetFact(new Fact("APExpectedIndex"), (float)receivedItemsHelper.Index);
-          SaveSystem.Save();
-        }
-
-
-        receivedItemsHelper.DequeueItem();
       }
       catch (Exception e)
       {
-        ApDebugLog.Instance.DisplayMessage($"Error in giving an item {e.Message}");
+        UnityMainThreadDispatcher.Instance().log($"Error in printing message {e.Message},{e.StackTrace}");
+        ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
       }
+
+      try
+      {
+        var itemReceivedInfo = receivedItemsHelper.DequeueItem();
+
+        if (receivedItemsHelper.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
+        {
+          return;
+        }
+
+        UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName}");
+        ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} with index {receivedItemsHelper.Index}");
+        GiveItem(itemReceivedInfo.ItemName);
+        FactSystem.AddToFact(new Fact("APExpectedIndex"), 1);
+        SaveSystem.Save();
+
+
+
+      }
+      catch (Exception e)
+      {
+        UnityMainThreadDispatcher.Instance().log($"Error in giving item {e.Message},{e.StackTrace}");
+        ApDebugLog.Instance.DisplayMessage($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f);
+      }
+    };
+  }
+
+  public void buildMessageReciver()
+  {
+    session.MessageLog.OnMessageReceived += (message) =>
+    {
+      ApDebugLog.Instance.DisplayMessage(message.ToString(), isDebug: false);
     };
   }
 
   public void CompleteGame()
   {
-    Debug.Log("AP Game is completed, it should release now");
+    UnityMainThreadDispatcher.Instance().log("AP Game is completed, it should release now");
     session.SetGoalAchieved();
   }
 
@@ -163,5 +181,10 @@ public class Connection(string hostname, int port)
         count++;
     }
     return count;
+  }
+
+  public bool IsLocationChecked(string location)
+  {
+    return session.Locations.AllLocationsChecked.Contains(session.Locations.GetLocationIdFromName(game, location));
   }
 }
