@@ -35,7 +35,7 @@ namespace Integration
             ApDebugLog.Instance.DisplayMessage("Got Shard");
             // Increase the number of shards that the player can use
             UpdateShardCount();
-            if (GM_Hub.isInHub && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+            if (FactSystem.GetFact(new Fact("in_run")) == 1f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
             {
               UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
               SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

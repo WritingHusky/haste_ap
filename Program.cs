@@ -22,7 +22,7 @@ public partial class Program
         instance.AddComponent<ApDebugLog>();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage("Archiplego Installed", isDebug: false);
+        ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.1.1", isDebug: false);
 
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
@@ -241,7 +241,7 @@ public partial class Program
     /// <summary>
     /// Hook into when a player buys and item. Used to give item locations
     /// </summary>
-    private static void StaticBuyItemHook(On.ShopItemHandler.orig_BuyItem orig, ShopItemHandler self, ItemInstance item, int price, ShopItem shopItem)
+    private static void StaticBuyItemHook(On.ShopItemHandler.orig_BuyItem orig, ShopItemHandler self, ItemInstance item, int price)
     {
         if (connection == null)
         {
@@ -256,8 +256,9 @@ public partial class Program
 
         connection.SendLocation(item_location);
         // Buy the item
-        orig(self, item, price, shopItem);
+        orig(self, item, price);
     }
+
 
     /// <summary>
     /// Hook into when a Boss is deafeted. Used to give boss locations
@@ -270,6 +271,7 @@ public partial class Program
             return;
         }
         var currentShard = RunHandler.RunData.shardID + 1;
+
         var boss_location = "Shard " + currentShard + " Boss";
         UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");
         ApDebugLog.Instance.DisplayMessage("Boss Defeated");
