@@ -347,6 +347,12 @@ public partial class Program
             return;
         }
 
+        if (self.character.name == "Captain")
+        {
+            self.State.SwitchState<InteractableCharacter.HasAbilityUnlockState>();
+
+        }
+
         if (!init)
         {
             if (self.interactionToPlay != null)
