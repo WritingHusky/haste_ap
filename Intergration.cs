@@ -35,7 +35,7 @@ namespace Integration
             ApDebugLog.Instance.DisplayMessage("Got Shard");
             // Increase the number of shards that the player can use
             UpdateShardCount();
-            if (FactSystem.GetFact(new Fact("in_run")) == 1f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+            if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
             {
               UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
               SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -146,6 +146,7 @@ namespace Integration
       FactSystem.SetFact(new Fact("researcher_in_hub"), 1f);
       FactSystem.SetFact(new Fact("sage_in_hub"), 1f);
       FactSystem.SetFact(new Fact("riza_in_hub"), 1f);
+      FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), 1f);
       // Skip Tutorials
       FactSystem.SetFact(new Fact("played_Tutorial01"), 1f);
       FactSystem.SetFact(new Fact("played_Tutorial02"), 1f);
