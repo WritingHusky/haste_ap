@@ -68,7 +68,7 @@ public class Connection(string hostname, int port)
     }
     else
     {
-      UnityMainThreadDispatcher.Instance().log("AP Failed to get Deathlink from slot data:" + loginSuccess.SlotData.toJson());
+      UnityMainThreadDispatcher.Instance().logError("AP Failed to get Deathlink from slot data:" + loginSuccess.SlotData.toJson());
       // Might default the value here to make things consistant
     }
     deathLinkService = session.CreateDeathLinkService();
@@ -81,13 +81,55 @@ public class Connection(string hostname, int port)
     }
     else
     {
-      UnityMainThreadDispatcher.Instance().log("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
+      UnityMainThreadDispatcher.Instance().logError("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
       // Might default the value here to make things consistant
     }
 
-    // SaveSystem.Save();
+        object Shopsanity;
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity", out Shopsanity))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found Shopsanity in slot data with value: {Shopsanity}");
+            FactSystem.SetFact(new Fact("APShopsanity"), Convert.ToSingle(Shopsanity));
+            if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
+            {
+                // this looks stupid, but its so that if you reconnect and the Facts are already there, it wont override them
+                if (FactSystem.GetFact(new Fact("APShopsanityShard1")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard1"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard2")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard2"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard3")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard3"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard4")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard4"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard5")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard5"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard6")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard6"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard7")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard7"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard8")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard8"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard9")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard9"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityShard10")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard10"), 0f);
+            } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
+            {
+                FactSystem.SetFact(new Fact("APShopsanityGlobal"), 0f);
+            }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get Shopsanity from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
 
-    return true;
+        object ShopsanityQuantity;
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity Quantity", out ShopsanityQuantity))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {ShopsanityQuantity}");
+            FactSystem.SetFact(new Fact("APShopsanityQuantity"), Convert.ToSingle(ShopsanityQuantity));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanityQuantity from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
+
+
+        // SaveSystem.Save();
+
+        return true;
   }
 
   public void SendLocation(string locationName)
@@ -97,8 +139,10 @@ public class Connection(string hostname, int port)
     long locationID = session.Locations.GetLocationIdFromName(game, locationName);
     if (locationID != -1)
     {
-      session.Locations.CompleteLocationChecks(locationID);
-    }
+            UnityMainThreadDispatcher.Instance().logError($"message BEFORE CompleteLocationChecks for location ID {locationID}");
+            session.Locations.CompleteLocationChecks(locationID);
+            UnityMainThreadDispatcher.Instance().logError($"message AFTER CompleteLocationChecks for location ID {locationID}");
+        }
     else
     {
       UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");

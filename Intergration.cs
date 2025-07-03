@@ -103,7 +103,7 @@ namespace Integration
         UnityMainThreadDispatcher.Instance().log($"Error within give item {e.Message},{e.StackTrace}");
         ApDebugLog.Instance.DisplayMessage($"Error within give item {e.Message},{e.StackTrace}", duration: 10f);
       }
-      SaveSystem.Save();
+      //SaveSystem.Save();
     }
 
     public static void AbilityTutorial()
