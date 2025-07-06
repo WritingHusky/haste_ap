@@ -59,34 +59,31 @@ public class Connection(string hostname, int port)
 
     dataTag = $"Haste_{loginSuccess.Team}_{loginSuccess.Slot}_";
 
-    // Try to get the values from the slot data and set them into the fact system
-    object Deathlink;
-    if (loginSuccess.SlotData.TryGetValue("DeathLink", out Deathlink))
-    {
-      UnityMainThreadDispatcher.Instance().log($"AP found DeathLink in slot data with value: {Deathlink}");
-      FactSystem.SetFact(new Fact("APDeathlink"), Convert.ToSingle(Deathlink));
-    }
-    else
-    {
-      UnityMainThreadDispatcher.Instance().logError("AP Failed to get Deathlink from slot data:" + loginSuccess.SlotData.toJson());
-      // Might default the value here to make things consistant
-    }
-    deathLinkService = session.CreateDeathLinkService();
+        // Try to get the values from the slot data and set them into the fact system
+        if (loginSuccess.SlotData.TryGetValue("DeathLink", out object Deathlink))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found DeathLink in slot data with value: {Deathlink}");
+            FactSystem.SetFact(new Fact("APDeathlink"), Convert.ToSingle(Deathlink));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get Deathlink from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
+        deathLinkService = session.CreateDeathLinkService();
 
-    object ForceReload;
-    if (loginSuccess.SlotData.TryGetValue("ForceReload", out ForceReload))
-    {
-      UnityMainThreadDispatcher.Instance().log($"AP found ForceReload in slot data with value: {ForceReload}");
-      FactSystem.SetFact(new Fact("APForceReload"), Convert.ToSingle(ForceReload));
-    }
-    else
-    {
-      UnityMainThreadDispatcher.Instance().logError("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
-      // Might default the value here to make things consistant
-    }
+        if (loginSuccess.SlotData.TryGetValue("ForceReload", out object ForceReload))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found ForceReload in slot data with value: {ForceReload}");
+            FactSystem.SetFact(new Fact("APForceReload"), Convert.ToSingle(ForceReload));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
 
-        object Shopsanity;
-        if (loginSuccess.SlotData.TryGetValue("Shopsanity", out Shopsanity))
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity", out object Shopsanity))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found Shopsanity in slot data with value: {Shopsanity}");
             FactSystem.SetFact(new Fact("APShopsanity"), Convert.ToSingle(Shopsanity));
@@ -103,7 +100,8 @@ public class Connection(string hostname, int port)
                 if (FactSystem.GetFact(new Fact("APShopsanityShard8")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard8"), 0f);
                 if (FactSystem.GetFact(new Fact("APShopsanityShard9")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard9"), 0f);
                 if (FactSystem.GetFact(new Fact("APShopsanityShard10")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard10"), 0f);
-            } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
+            }
+            else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
             {
                 FactSystem.SetFact(new Fact("APShopsanityGlobal"), 0f);
             }
@@ -114,8 +112,7 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
-        object ShopsanityQuantity;
-        if (loginSuccess.SlotData.TryGetValue("Shopsanity Quantity", out ShopsanityQuantity))
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity Quantity", out object ShopsanityQuantity))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {ShopsanityQuantity}");
             FactSystem.SetFact(new Fact("APShopsanityQuantity"), Convert.ToSingle(ShopsanityQuantity));
@@ -123,6 +120,18 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanityQuantity from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
+
+
+        if (loginSuccess.SlotData.TryGetValue("Shard Goal", out object ShardGoal))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found ShardGoal in slot data with value: {ShardGoal}");
+            FactSystem.SetFact(new Fact("APShardGoal"), Convert.ToSingle(ShardGoal));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShardGoal from slot data:" + loginSuccess.SlotData.toJson());
             // Might default the value here to make things consistant
         }
 

@@ -22,7 +22,7 @@ public partial class Program
         instance.AddComponent<ApDebugLog>();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.1.2", isDebug: false);
+        ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.2.0", isDebug: false);
 
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
@@ -286,8 +286,13 @@ public partial class Program
         ApDebugLog.Instance.DisplayMessage("Boss Defeated");
 
         // TODO add handling for numeral boss locations
-
-        connection.SendLocation(boss_location);
+        if (currentShard == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal")))){
+            ApDebugLog.Instance.DisplayMessage("Game Complete");
+            connection.CompleteGame();
+        } else
+        {
+            connection.SendLocation(boss_location);
+        }
         orig();
     }
 
@@ -301,8 +306,11 @@ public partial class Program
             ApDebugLog.Instance.DisplayMessage("AP On End Boss Win the connection is null");
             return;
         }
-        ApDebugLog.Instance.DisplayMessage("Game Complete");
-        connection.CompleteGame();
+        if (Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal"))) == 10)
+        {
+            ApDebugLog.Instance.DisplayMessage("Game Complete");
+            connection.CompleteGame();
+        }
         orig();
     }
 

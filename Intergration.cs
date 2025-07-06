@@ -67,6 +67,11 @@ namespace Integration
             MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
             SaveSystem.Save();
             break;
+          case "Anti-Spark 10 bundle":
+            UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 10 bundle");
+            ApDebugLog.Instance.DisplayMessage("Got Anti-spark 10");
+            FactSystem.AddToFact(new Fact("meta_progression_resource"), 10f);
+            break;
           case "Anti-Spark 100 bundle":
             UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 100 bundle");
             ApDebugLog.Instance.DisplayMessage("Got Anti-spark 100");
