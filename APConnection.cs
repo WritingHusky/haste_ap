@@ -135,6 +135,28 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
+        if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitBody in slot data with value: {DefSkinBody}");
+            FactSystem.SetFact(new Fact("equipped_skin_body"), Convert.ToSingle(DefSkinBody));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get DefaultOutfitBody from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("Default Outfit Hat", out object DefSkinHat))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitHat in slot data with value: {DefSkinHat}");
+            FactSystem.SetFact(new Fact("equipped_skin_head"), Convert.ToSingle(DefSkinHat));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get DefaultOutfitHat from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
+
 
         // SaveSystem.Save();
 
