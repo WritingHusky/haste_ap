@@ -310,6 +310,9 @@ public partial class Program
         {
             ApDebugLog.Instance.DisplayMessage("Game Complete");
             connection.CompleteGame();
+        } else
+        {
+            connection.SendLocation("Shard 10 Boss");
         }
         orig();
     }
