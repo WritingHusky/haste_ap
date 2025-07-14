@@ -7,7 +7,7 @@
         <LangVersion>latest</LangVersion>
 
         <!-- If your Steam is installed in a different directory (or you're on mac/linux), edit this to point to Haste's DLLs -->
-        <HasteDlls Condition=" '$(HasteDlls)' == '' ">C:\Program Files (x86)\Steam\steamapps\common\Haste\Haste_Data\Managed\*.dll</HasteDlls>
+        <HasteDlls Condition=" '$(HasteDlls)' == '' ">G:\Program Files (x86)\Steam\steamapps\common\Haste\Haste_Data\Managed\*.dll</HasteDlls>
 
         <!-- We are referencing mscorlib/netstandard/etc. in the game, so disable the system framework refs -->
         <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
