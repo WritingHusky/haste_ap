@@ -182,6 +182,7 @@ public partial class Program
         ApDebugLog.Instance.DisplayMessage("Loaded into hub");
 
         UpdateShardCount();
+        SetHubState();
 
         // Only do these on the first load of the game
         if (FactSystem.GetFact(new Fact("APForceReloadFirstLoad")) == 0f)

@@ -67,6 +67,56 @@ namespace Integration
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         break;
+                    case "Wraith":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Wraith");
+                        ApDebugLog.Instance.DisplayMessage("Got Wraith");
+                        FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
+                        if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+                        {
+                            UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
+                            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                        }
+                        break;
+                    case "Niada":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Niada");
+                        ApDebugLog.Instance.DisplayMessage("Got Niada");
+                        FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
+                        if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+                        {
+                            UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
+                            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                        }
+                        break;
+                    case "Daro":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Daro");
+                        ApDebugLog.Instance.DisplayMessage("Got Daro");
+                        FactSystem.SetFact(new Fact("APSageInHub"), 1f);
+                        if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+                        {
+                            UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
+                            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                        }
+                        break;
+                    case "The Captain":
+                        UnityMainThreadDispatcher.Instance().log("AP Got The Captain");
+                        ApDebugLog.Instance.DisplayMessage("Got The Captain");
+                        FactSystem.SetFact(new Fact("APCaptainInHub"), 1f);
+                        if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+                        {
+                            UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
+                            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                        }
+                        break;
+                    case "Fashion Weeboh":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Fashion Weeboh");
+                        ApDebugLog.Instance.DisplayMessage("Got Fashion Weeboh");
+                        FactSystem.SetFact(new Fact("APFashionInHub"), 1f);
+                        if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+                        {
+                            UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
+                            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+                        }
+                        break;
                     case "Anti-Spark 10 bundle":
                         UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 10 bundle");
                         ApDebugLog.Instance.DisplayMessage("Got Anti-spark 10");
@@ -147,13 +197,24 @@ namespace Integration
         // Sets NPCs in overworld
         public static void SetHubState()
         {
-            FactSystem.SetFact(new Fact("captain_in_hub"), 1f);
-            FactSystem.SetFact(new Fact("heir_in_hub"), 1f);
-            FactSystem.SetFact(new Fact("wraith_in_hub"), 1f);
+            if (FactSystem.GetFact(new Fact("APNPCShuffle")) == 1f)
+            {
+                FactSystem.SetFact(new Fact("captain_in_hub"), FactSystem.GetFact(new Fact("APCaptainInHub")));
+                FactSystem.SetFact(new Fact("heir_in_hub"), FactSystem.GetFact(new Fact("APHeirInHub")));
+                FactSystem.SetFact(new Fact("wraith_in_hub"), FactSystem.GetFact(new Fact("APWraithInHub")));
+                FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), FactSystem.GetFact(new Fact("APFashionInHub")));
+                FactSystem.SetFact(new Fact("sage_in_hub"), FactSystem.GetFact(new Fact("APSageInHub")));
+            }
+            else
+            {
+                FactSystem.SetFact(new Fact("captain_in_hub"), 1f);
+                FactSystem.SetFact(new Fact("heir_in_hub"), 1f);
+                FactSystem.SetFact(new Fact("wraith_in_hub"), 1f);
+                FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), 1f);
+                FactSystem.SetFact(new Fact("sage_in_hub"), 1f);
+            }
             FactSystem.SetFact(new Fact("researcher_in_hub"), 1f);
-            FactSystem.SetFact(new Fact("sage_in_hub"), 1f);
             FactSystem.SetFact(new Fact("riza_in_hub"), 1f);
-            FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), 1f);
             
         }
 

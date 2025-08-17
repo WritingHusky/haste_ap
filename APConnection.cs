@@ -124,6 +124,22 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
+        if (loginSuccess.SlotData.TryGetValue("NPC Shuffle", out object NPCShuffle))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found NPC Shuffle in slot data with value: {NPCShuffle}");
+            FactSystem.SetFact(new Fact("APNPCShuffle"), Convert.ToSingle(NPCShuffle));
+            if (FactSystem.GetFact(new Fact("APCaptainInHub")) == 0f) FactSystem.SetFact(new Fact("APCaptainInHub"), 0f);
+            if (FactSystem.GetFact(new Fact("APHeirInHub")) == 0f) FactSystem.SetFact(new Fact("APHeirInHub"), 0f);
+            if (FactSystem.GetFact(new Fact("APWraithInHub")) == 0f) FactSystem.SetFact(new Fact("APWraithInHub"), 0f);
+            if (FactSystem.GetFact(new Fact("APFashionInHub")) == 0f) FactSystem.SetFact(new Fact("APFashionInHub"), 0f);
+            if (FactSystem.GetFact(new Fact("APSageInHub")) == 0f) FactSystem.SetFact(new Fact("APSageInHub"), 0f);
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get NPCShuffle from slot data:" + loginSuccess.SlotData.toJson());
+            // Might default the value here to make things consistant
+        }
+
 
         if (loginSuccess.SlotData.TryGetValue("Shard Goal", out object ShardGoal))
         {

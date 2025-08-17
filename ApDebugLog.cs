@@ -94,7 +94,7 @@ public class ApDebugLog : MonoBehaviour
                     }
                 }
                 // if filter == 2f
-                // figure out how to tell if this message is just a chat; probably just has one part
+                // TODO: figure out how to tell if this message is just a chat; probably just has one part
             }
             else
             {
@@ -125,7 +125,7 @@ public class ApDebugLog : MonoBehaviour
             {
                 return;
             }
-            message = $"Debug: {message}";
+            message = $"<color=#FFFF00>Debug:</color> {message}";
         }
 
         if (duration == -1f)
@@ -144,7 +144,8 @@ public class ApDebugLog : MonoBehaviour
                 textComponent.text = message;
                 textComponent.fontSize = fontSize;
                 textComponent.alignment = TextAlignmentOptions.Left;
-                // add text outline for visibily?
+                textComponent.outlineColor = Color.black;
+                textComponent.outlineWidth = 2;
 
                 if (fontMode == FontMode.GameFont && _fontAsset != null)
                 {
