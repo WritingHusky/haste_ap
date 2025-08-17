@@ -144,10 +144,9 @@ namespace Integration
             }
         }
 
-        // Maybe put this in the SaveSystem.load()
-        public static void SetDefeaultState()
+        // Sets NPCs in overworld
+        public static void SetHubState()
         {
-            // Make sure everyone is in the hub
             FactSystem.SetFact(new Fact("captain_in_hub"), 1f);
             FactSystem.SetFact(new Fact("heir_in_hub"), 1f);
             FactSystem.SetFact(new Fact("wraith_in_hub"), 1f);
@@ -155,14 +154,18 @@ namespace Integration
             FactSystem.SetFact(new Fact("sage_in_hub"), 1f);
             FactSystem.SetFact(new Fact("riza_in_hub"), 1f);
             FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), 1f);
-            // Skip Tutorials
-            FactSystem.SetFact(new Fact("played_Tutorial01"), 1f);
-            FactSystem.SetFact(new Fact("played_Tutorial02"), 1f);
-            FactSystem.SetFact(new Fact("tutorial_finished"), 1f);
-            FactSystem.SetFact(new Fact("FirstTimeShop"), 1f);
-            // Skip All mid-run conversations(?)
-            FactSystem.SetFact(new Fact("main_story_progress"), 6f);
+            
         }
 
+
+        public static void ClearStoryFlags()
+        {
+            foreach (string s in StoryFlags.StoryFlags.AllFlags)
+            {
+                FactSystem.SetFact(new Fact(s), 1f);
+            }
+            // still not sure this works but we'll try it anyway
+            FactSystem.SetFact(new Fact("main_story_progress"), 6f);
+        }
     }
 }

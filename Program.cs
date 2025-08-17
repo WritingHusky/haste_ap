@@ -81,7 +81,7 @@ public partial class Program
         Integration.Integration.connection = connection;
 
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
-        SetDefeaultState();
+        SetHubState();
 
         FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
         {
@@ -97,28 +97,15 @@ public partial class Program
             }
         });
 
-        SaveSystem.Save();
 
-        // Only add the hooks on first load
-        if (FactSystem.GetFact(new Fact("APFirstLoad")) == 1f)
+        // only need to bother with this once a savefile
+        if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
         {
-            // Need to add the deathlink to connection still if first load
-            if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
-            {
-                ApDebugLog.Instance.DisplayMessage("Deathlink Enabled");
-                connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
-
-                connection.deathLinkService!.EnableDeathLink();
-
-            }
-
-            // Move on
-            ApDebugLog.Instance.DisplayMessage("Loaded again");
-
-            orig();
-            return;
+            ClearStoryFlags();
         }
 
+        SaveSystem.Save();
+        
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
             UnityMainThreadDispatcher.Instance().log("AP DeathLink is Enabled");
@@ -240,6 +227,11 @@ public partial class Program
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
         On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
         On.GM_API.OnSpawnedInHub -= StaticLoadHubHook;
+        if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
+        {
+            On.Player.Die -= StaticSendDeathOnDie;
+
+        }
         UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
     }
 
