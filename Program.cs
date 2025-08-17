@@ -49,7 +49,7 @@ public partial class Program
             ApDebugLog.Instance.DisplayMessage("AP Disabled");
 
             UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
-            FactSystem.SetFact(new Fact("APFisrtLoad"), 1f);
+            FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
             orig();
             return;
         }
@@ -100,7 +100,7 @@ public partial class Program
         SaveSystem.Save();
 
         // Only add the hooks on first load
-        if (FactSystem.GetFact(new Fact("APFisrtLoad")) == 1f)
+        if (FactSystem.GetFact(new Fact("APFirstLoad")) == 1f)
         {
             // Need to add the deathlink to connection still if first load
             if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
@@ -137,13 +137,12 @@ public partial class Program
             UnityMainThreadDispatcher.Instance().log("AP Deathlink is Disabled");
         }
 
-
-
         // Add Game base Actions
         UnityMainThreadDispatcher.Instance().log("AP Creating Hooks");
 
         // Override the handling of completing of a run to 
         On.GM_API.OnRunEnd += StaticCompleteRunHook;
+        On.GM_API.OnPlayerEnteredPortal += StaticFragmentComplete;
 
         On.GM_API.OnEndBossWin += StaticEndBossHook;
 
@@ -156,6 +155,7 @@ public partial class Program
 
         On.Landfall.Haste.AbilityUnlockScreen.Unlock += StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start += StaticInteractableCharacterStartHook;
+        On.InteractableCharacter.Interact += StaticInteractableCharacterInteractHook;
 
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
@@ -163,12 +163,11 @@ public partial class Program
         // Once the player starts in game do the loading as somethings are not setup yet
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
 
-        FactSystem.SetFact(new Fact("APFisrtLoad"), 1f);
+        FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
         UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
         ApDebugLog.Instance.DisplayMessage("Loading normaly now");
         orig();
     }
-
 
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
@@ -218,10 +217,30 @@ public partial class Program
             connection.Close();
             connection = null;
             ApDebugLog.Instance.DisplayMessage("Removed connection");
+            ClearHooks();
             FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         }
 
         orig();
+    }
+
+
+    /// <summary>
+    /// Extra function to remove hooks on exiting the game, so that new hooks arent accidentally installed ontop of existing ones
+    /// </summary>
+    private static void ClearHooks()
+    {
+        On.GM_API.OnRunEnd -= StaticCompleteRunHook;
+        On.GM_API.OnPlayerEnteredPortal -= StaticFragmentComplete;
+        On.GM_API.OnEndBossWin -= StaticEndBossHook;
+        On.GM_API.OnBossDeath -= StaticBossDeathHook;
+        On.ShopItemHandler.BuyItem -= StaticBuyItemHook;
+        On.SaveSystem.Load -= StaticSaveLoadHook;
+        On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
+        On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
+        On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
+        On.GM_API.OnSpawnedInHub -= StaticLoadHubHook;
+        UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
     }
 
     /// <summary>
@@ -239,6 +258,50 @@ public partial class Program
     }
 
     /// <summary>
+    /// Hook into when a player clears a fragment. Used to give fragment locations
+    /// </summary>
+    private static void StaticFragmentComplete(On.GM_API.orig_OnPlayerEnteredPortal orig, Player player)
+    {
+        if (connection == null)
+        {
+            ApDebugLog.Instance.DisplayMessage("AP On Fragment Clear the connection is null");
+            return;
+        }
+        // make sure youre actually in a fragment, not a rest/shop/challenge
+        if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge())
+        {
+            FactSystem.AddToFact(new Fact("APFragmentCounter"), 1f);
+            ApDebugLog.Instance.DisplayMessage($"Cleared Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentCounter"))}/{FactSystem.GetFact(new Fact("APFragmentLimit"))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1}");
+            if (FactSystem.GetFact(new Fact("APFragmentCounter")) == FactSystem.GetFact(new Fact("APFragmentLimit")))
+            {
+                connection.SendLocation("Fragment Clear " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1));
+                FactSystem.AddToFact(new Fact("APFragmentLocation"), 1f);
+                FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
+                if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
+                {
+                    // if MODE H-TRI
+                    // LIMIT = floor(FRAGMENTLOCATION / 2)
+                    FactSystem.SetFact(new Fact("APFragmentCounter"), (float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation"))/2));
+                }
+                else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 3f)
+                {
+                    // if MODE H-TRI-CAP
+                    // LIMIT = min( floor(FRAGMENTLOCATION / 2), 10
+                    FactSystem.SetFact(new Fact("APFragmentCounter"), Math.Min((float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation")) / 2), 10f));
+                }
+                else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 4f)
+                {
+                    // if MODE TRI
+                    // LIMIT = FRAGMENTLOCATION
+                    FactSystem.SetFact(new Fact("APFragmentCounter"), FactSystem.GetFact(new Fact("APFragmentLocation")));
+                }
+
+            }
+        }
+        orig(player);
+    }
+
+    /// <summary>
     /// Hook into when a player buys and item. Used to give item locations
     /// </summary>
     private static void StaticBuyItemHook(On.ShopItemHandler.orig_BuyItem orig, ShopItemHandler self, ItemInstance item, int price)
@@ -249,21 +312,27 @@ public partial class Program
             return;
         }
         var item_location = "";
+        bool canSend = true;
         if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
         {
             var currentShard = RunHandler.RunData.shardID + 1;
             item_location = "Shard " + currentShard + " Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1);
             FactSystem.AddToFact(new Fact("APShopsanityShard" + currentShard), 1f);
+            canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
         } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
         {
-            item_location = "Gloabl Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1);
+            item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1);
             FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
+            canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
         }
-        UnityMainThreadDispatcher.Instance().log("AP sending Item: (" + item_location + ")");
-        ApDebugLog.Instance.DisplayMessage("Bought Item");
-        // TODO add handling for numeral item locations
 
-        connection.SendLocation(item_location);
+        if (canSend)
+        {
+            UnityMainThreadDispatcher.Instance().log("AP sending Item: (" + item_location + ")");
+            ApDebugLog.Instance.DisplayMessage("Bought Item");
+
+            connection.SendLocation(item_location);
+        }
         // Buy the item
         orig(self, item, price);
     }
@@ -386,6 +455,18 @@ public partial class Program
             }
         }
     }
+
+    private static void StaticInteractableCharacterInteractHook(On.InteractableCharacter.orig_Interact orig, InteractableCharacter self)
+    {
+        var ability = self.character.Ability;
+        var abilityName = Enum.GetName(typeof(AbilityKind), ability);
+
+        if (self.character.HasAbilityUnlock && connection!= null)
+        {
+            connection.SendHintedLocation($"Ability {abilityName}");
+        }
+        orig(self);
+    }
 }
 
 
@@ -415,6 +496,18 @@ public class ApDebugEnabledSetting : BoolSetting, IExposedSetting
     protected override bool GetDefaultValue() => false;
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Debug Toggle");
     public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApLogFilter : EnumSetting<APFilterMode>, IExposedSetting
+{
+    public override void ApplyValue() => FactSystem.SetFact(new Fact("APMessageFilter"), (float)Value);
+    protected override APFilterMode GetDefaultValue() => APFilterMode.None;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Filter");
+    public string GetCategory() => "AP";
+
+    public override List<LocalizedString> GetLocalizedChoices() => [new UnlocalizedString("All Messages"), new UnlocalizedString("Only Messages About Player"), new UnlocalizedString("Player Messages + Chat")];
+
 }
 
 [HasteSetting]

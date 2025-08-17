@@ -31,3 +31,10 @@ public enum DisplayMode
   Always,
   InRun,
 }
+
+public enum APFilterMode
+{
+    None,
+    PlayerOnly,
+    PlayerAndChat
+}

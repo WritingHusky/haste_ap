@@ -3,61 +3,62 @@ using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Enums;
 using Landfall.Haste;
 using UnityEngine.Purchasing.MiniJSON;
+using Zorro.Settings;
 
 namespace APConnection;
 
 public class Connection(string hostname, int port)
 {
-  private string server = hostname + port.ToString();
-  public string game = "Haste";
+    private string server = hostname + port.ToString();
+    public string game = "Haste";
 
-  public string dataTag = "Haste";
-  public ArchipelagoSession session = ArchipelagoSessionFactory.CreateSession(hostname, port);
+    public string dataTag = "Haste";
+    public ArchipelagoSession session = ArchipelagoSessionFactory.CreateSession(hostname, port);
 
-  public string username = "";
+    public string username = "";
 
-  public DeathLinkService? deathLinkService;
+    public DeathLinkService? deathLinkService;
 
-  public bool Connect(string user = "Player1", string? pass = null)
-  {
-    username = user;
-    LoginResult result;
-    try
+    public bool Connect(string user = "Player1", string? pass = null)
     {
-      UnityMainThreadDispatcher.Instance().log("AP Attempting to connect");
-      // handle TryConnectAndLogin attempt here and save the returned object to `result`
-      result = session.TryConnectAndLogin(game, user, ItemsHandlingFlags.AllItems, password: pass);
+        username = user;
+        LoginResult result;
+        try
+        {
+            UnityMainThreadDispatcher.Instance().log("AP Attempting to connect");
+            // handle TryConnectAndLogin attempt here and save the returned object to `result`
+            result = session.TryConnectAndLogin(game, user, ItemsHandlingFlags.AllItems, password: pass);
 
-    }
-    catch (Exception e)
-    {
-      result = new LoginFailure(e.GetBaseException().Message);
-    }
+        }
+        catch (Exception e)
+        {
+            result = new LoginFailure(e.GetBaseException().Message);
+        }
 
-    // If it fails
-    if (!result.Successful)
-    {
-      LoginFailure failure = (LoginFailure)result;
-      string errorMessage = $"Failed to Connect to {server} as {user}:";
-      foreach (string error in failure.Errors)
-      {
-        errorMessage += $"\n    {error}";
-      }
-      foreach (ConnectionRefusedError error in failure.ErrorCodes)
-      {
-        errorMessage += $"\n    {error}";
-      }
-      UnityMainThreadDispatcher.Instance().log("AP Connection failed");
-      UnityMainThreadDispatcher.Instance().logError(errorMessage);
-      return false; // Did not connect, show the user the contents of `errorMessage`
-      // TODO Add display message to signal a failure
-    }
+        // If it fails
+        if (!result.Successful)
+        {
+            LoginFailure failure = (LoginFailure)result;
+            string errorMessage = $"Failed to Connect to {server} as {user}:";
+            foreach (string error in failure.Errors)
+            {
+                errorMessage += $"\n    {error}";
+            }
+            foreach (ConnectionRefusedError error in failure.ErrorCodes)
+            {
+                errorMessage += $"\n    {error}";
+            }
+            UnityMainThreadDispatcher.Instance().log("AP Connection failed");
+            UnityMainThreadDispatcher.Instance().logError(errorMessage);
+            return false; // Did not connect, show the user the contents of `errorMessage`
+                          // TODO Add display message to signal a failure
+        }
 
-    // Successfully connected, `ArchipelagoSession` (assume statically defined as `session` from now on) can now be used to interact with the server and the returned `LoginSuccessful` contains some useful information about the initial connection (e.g. a copy of the slot data as `loginSuccess.SlotData`)
-    var loginSuccess = (LoginSuccessful)result;
-    UnityMainThreadDispatcher.Instance().log("AP Connection Succeded");
+        // Successfully connected, `ArchipelagoSession` (assume statically defined as `session` from now on) can now be used to interact with the server and the returned `LoginSuccessful` contains some useful information about the initial connection (e.g. a copy of the slot data as `loginSuccess.SlotData`)
+        var loginSuccess = (LoginSuccessful)result;
+        UnityMainThreadDispatcher.Instance().log("AP Connection Succeded");
 
-    dataTag = $"Haste_{loginSuccess.Team}_{loginSuccess.Slot}_";
+        dataTag = $"Haste_{loginSuccess.Team}_{loginSuccess.Slot}_";
 
         // Try to get the values from the slot data and set them into the fact system
         if (loginSuccess.SlotData.TryGetValue("DeathLink", out object Deathlink))
@@ -103,7 +104,7 @@ public class Connection(string hostname, int port)
             }
             else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
             {
-                FactSystem.SetFact(new Fact("APShopsanityGlobal"), 0f);
+                if (FactSystem.GetFact(new Fact("APShopsanityGlobal")) == 0f) FactSystem.SetFact(new Fact("APShopsanityGlobal"), 0f);
             }
         }
         else
@@ -135,6 +136,30 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
+
+        if (loginSuccess.SlotData.TryGetValue("Fragmentsanity", out object Fragmentsanity))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found Fragmentsanity in slot data with value: {Fragmentsanity}");
+            FactSystem.SetFact(new Fact("APFragmentsanity"), Convert.ToSingle(Fragmentsanity));
+            if (Convert.ToSingle(Fragmentsanity) == 1f)
+            {
+                loginSuccess.SlotData.TryGetValue("Linear Fragmentsanity Rate", out object LFR);
+                if (FactSystem.GetFact(new Fact("APFragmentLimit")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimit"), Convert.ToSingle(LFR));
+            } else
+            {
+                if (FactSystem.GetFact(new Fact("APFragmentLimit")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimit"), 1f);
+            }
+            if (FactSystem.GetFact(new Fact("APFragmentCounter")) == 0f) FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get FragmentLocations from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APFragmentsanity"), 0f);
+            FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
+            FactSystem.SetFact(new Fact("APFragmentLimit"), 0f);
+        }
+
+
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitBody in slot data with value: {DefSkinBody}");
@@ -157,109 +182,131 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
+        // get the AP Debug Log settings.
+        // normally this value gets set when you toggle the settings from the menu, however the initial value from previous sessions needs to be loaded manually at the start for it to take effect
+        var settingsHandler = GameHandler.Instance.SettingsHandler;
+        var EnabledLog = settingsHandler.GetSetting<ApDebugEnabledSetting>().Value;
+        FactSystem.SetFact(new Fact("APDebugLogEnabled"), EnabledLog ? 1f : 0f);
+
 
         // SaveSystem.Save();
 
         return true;
-  }
-
-  public void SendLocation(string locationName)
-  {
-    UnityMainThreadDispatcher.Instance().log($"AP Sending location {locationName}");
-    ApDebugLog.Instance.DisplayMessage($"Sending location {locationName}");
-    long locationID = session.Locations.GetLocationIdFromName(game, locationName);
-    if (locationID != -1)
-    {
-            UnityMainThreadDispatcher.Instance().logError($"message BEFORE CompleteLocationChecks for location ID {locationID}");
-            session.Locations.CompleteLocationChecks(locationID);
-            UnityMainThreadDispatcher.Instance().logError($"message AFTER CompleteLocationChecks for location ID {locationID}");
-        }
-    else
-    {
-      UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
     }
-  }
 
-  public void Close()
-  {
-    UnityMainThreadDispatcher.Instance().log("AP Disconnecting");
-    session.Socket.DisconnectAsync();
-    UnityMainThreadDispatcher.Instance().log("AP Disconnected");
-  }
-
-  public void BuildItemReciver(Action<string> GiveItem)
-  {
-
-    UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
-    ApDebugLog.Instance.DisplayMessage($"Built item reciever");
-
-    session.Items.ItemReceived += (receivedItemsHelper) =>
+    public void SendLocation(string locationName)
     {
-      try
-      {
-
-        UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
-        ApDebugLog.Instance.DisplayMessage("Item Recieved");
-      }
-      catch (Exception e)
-      {
-        UnityMainThreadDispatcher.Instance().log($"Error in printing message {e.Message},{e.StackTrace}");
-        ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
-      }
-
-      try
-      {
-        var itemReceivedInfo = receivedItemsHelper.DequeueItem();
-
-        if (receivedItemsHelper.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
+        UnityMainThreadDispatcher.Instance().log($"AP Sending location {locationName}");
+        ApDebugLog.Instance.DisplayMessage($"Sending location {locationName}");
+        long locationID = session.Locations.GetLocationIdFromName(game, locationName);
+        if (locationID != -1)
         {
-          return;
+            session.Locations.CompleteLocationChecks(locationID);
         }
-
-        UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName}");
-        ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} with index {receivedItemsHelper.Index}");
-        GiveItem(itemReceivedInfo.ItemName);
-        FactSystem.AddToFact(new Fact("APExpectedIndex"), 1);
-        SaveSystem.Save();
-
-
-
-      }
-      catch (Exception e)
-      {
-        UnityMainThreadDispatcher.Instance().log($"Error in giving item {e.Message},{e.StackTrace}");
-        ApDebugLog.Instance.DisplayMessage($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f);
-      }
-    };
-  }
-
-  public void buildMessageReciver()
-  {
-    session.MessageLog.OnMessageReceived += (message) =>
-    {
-      ApDebugLog.Instance.DisplayMessage(message.ToString(), isDebug: false);
-    };
-  }
-
-  public void CompleteGame()
-  {
-    UnityMainThreadDispatcher.Instance().log("AP Game is completed, it should release now");
-    session.SetGoalAchieved();
-  }
-
-  public int GetItemCount(string item_name)
-  {
-    var count = 0;
-    foreach (var item in session.Items.AllItemsReceived)
-    {
-      if (item.ItemName == item_name)
-        count++;
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
+        }
     }
-    return count;
-  }
 
-  public bool IsLocationChecked(string location)
-  {
-    return session.Locations.AllLocationsChecked.Contains(session.Locations.GetLocationIdFromName(game, location));
-  }
+    public void SendHintedLocation(string locationName)
+    {
+        UnityMainThreadDispatcher.Instance().log($"AP Scouting location {locationName}");
+        ApDebugLog.Instance.DisplayMessage($"Scouting location {locationName}");
+        long locationID = session.Locations.GetLocationIdFromName(game, locationName);
+        if (locationID != -1)
+        {
+            session.Locations.ScoutLocationsAsync(hintCreationPolicy: HintCreationPolicy.CreateAndAnnounceOnce, locationID);
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
+        }
+    }
+
+    public void Close()
+    {
+        UnityMainThreadDispatcher.Instance().log("AP Disconnecting");
+        session.Socket.DisconnectAsync();
+        UnityMainThreadDispatcher.Instance().log("AP Disconnected");
+    }
+
+    public void BuildItemReciver(Action<string> GiveItem)
+    {
+
+        UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
+        ApDebugLog.Instance.DisplayMessage($"Built item reciever");
+
+        session.Items.ItemReceived += (receivedItemsHelper) =>
+        {
+            try
+            {
+
+                UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
+                ApDebugLog.Instance.DisplayMessage("Item Recieved");
+            }
+            catch (Exception e)
+            {
+                UnityMainThreadDispatcher.Instance().log($"Error in printing message {e.Message},{e.StackTrace}");
+                ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
+            }
+
+            try
+            {
+                var itemReceivedInfo = receivedItemsHelper.DequeueItem();
+
+                if (receivedItemsHelper.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
+                {
+                    return;
+                }
+
+                UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName}");
+                ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} with index {receivedItemsHelper.Index}");
+                GiveItem(itemReceivedInfo.ItemName);
+                FactSystem.AddToFact(new Fact("APExpectedIndex"), 1);
+                SaveSystem.Save();
+
+
+
+            }
+            catch (Exception e)
+            {
+                if (e.GetType() != typeof(NullReferenceException))
+                {
+                    UnityMainThreadDispatcher.Instance().log($"Error in giving item {e.Message},{e.StackTrace}");
+                    ApDebugLog.Instance.DisplayMessage($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f);
+                }
+            }
+        };
+    }
+
+    public void buildMessageReciver()
+    {
+        session.MessageLog.OnMessageReceived += (message) =>
+        {
+            ApDebugLog.Instance.DisplayMessage(message, isDebug: false);
+        };
+    }
+
+    public void CompleteGame()
+    {
+        UnityMainThreadDispatcher.Instance().log("AP Game is completed, it should release now");
+        session.SetGoalAchieved();
+    }
+
+    public int GetItemCount(string item_name)
+    {
+        var count = 0;
+        foreach (var item in session.Items.AllItemsReceived)
+        {
+            if (item.ItemName == item_name)
+                count++;
+        }
+        return count;
+    }
+
+    public bool IsLocationChecked(string location)
+    {
+        return session.Locations.AllLocationsChecked.Contains(session.Locations.GetLocationIdFromName(game, location));
+    }
 }
