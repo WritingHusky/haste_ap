@@ -20,6 +20,7 @@ public partial class Program
         GameObject instance = new(nameof(ApDebugLog));
         UnityEngine.Object.DontDestroyOnLoad(instance);
         instance.AddComponent<ApDebugLog>();
+        ApDebugLog.Instance.BuildFont();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
         ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.2.0", isDebug: false);
@@ -82,6 +83,7 @@ public partial class Program
 
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         SetHubState();
+        SetFragmentLimits();
 
         FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
         {
@@ -144,6 +146,8 @@ public partial class Program
         On.InteractableCharacter.Start += StaticInteractableCharacterStartHook;
         On.InteractableCharacter.Interact += StaticInteractableCharacterInteractHook;
 
+        On.PlayerCharacter.RestartPlayer_Launch_Transform_float += StaticSetSpeed;
+        On.PlayerCharacter.RestartPlayer_Still_Transform += StaticSetSpeed;
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
 
@@ -152,8 +156,34 @@ public partial class Program
 
         FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
         UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
-        ApDebugLog.Instance.DisplayMessage("Loading normaly now");
+        ApDebugLog.Instance.DisplayMessage("Loading normally now");
         orig();
+    }
+
+    private static void StaticSetSpeed(On.PlayerCharacter.orig_RestartPlayer_Still_Transform orig, PlayerCharacter self, Transform spawnPoint)
+    {
+        if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1)
+        {
+            SecretSetSpeed(self);
+        }
+        orig(self, spawnPoint);
+    }
+
+    private static void StaticSetSpeed(On.PlayerCharacter.orig_RestartPlayer_Launch_Transform_float orig, PlayerCharacter self, Transform spawnPoint, float minVel)
+    {
+        if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1)
+        {
+            SecretSetSpeed(self);
+        }
+        orig(self, spawnPoint, minVel);
+    }
+
+    private static void SecretSetSpeed(PlayerCharacter player)
+    {
+        var APspeed = FactSystem.GetFact(new Fact("APSpeedUpgradesCollected"));
+        float calcSpeed = 0.6f + (APspeed * 0.1f);
+        ApDebugLog.Instance.DisplayMessage($"Setting speed to {calcSpeed}");
+        player.player.stats.runSpeed.multiplier = calcSpeed;
     }
 
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
@@ -228,6 +258,8 @@ public partial class Program
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
         On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
         On.GM_API.OnSpawnedInHub -= StaticLoadHubHook;
+        On.PlayerCharacter.RestartPlayer_Launch_Transform_float -= StaticSetSpeed;
+        On.PlayerCharacter.RestartPlayer_Still_Transform -= StaticSetSpeed;
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
             On.Player.Die -= StaticSendDeathOnDie;
@@ -264,34 +296,38 @@ public partial class Program
         if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge())
         {
             FactSystem.AddToFact(new Fact("APFragmentCounter"), 1f);
-            ApDebugLog.Instance.DisplayMessage($"Cleared Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentCounter"))}/{FactSystem.GetFact(new Fact("APFragmentLimit"))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1}");
+            ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentCounter"))}/{FactSystem.GetFact(new Fact("APFragmentLimit"))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1}", isDebug:false);
             if (FactSystem.GetFact(new Fact("APFragmentCounter")) == FactSystem.GetFact(new Fact("APFragmentLimit")))
             {
                 connection.SendLocation("Fragment Clear " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1));
                 FactSystem.AddToFact(new Fact("APFragmentLocation"), 1f);
                 FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
-                if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
-                {
-                    // if MODE H-TRI
-                    // LIMIT = floor(FRAGMENTLOCATION / 2)
-                    FactSystem.SetFact(new Fact("APFragmentCounter"), (float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation"))/2));
-                }
-                else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 3f)
-                {
-                    // if MODE H-TRI-CAP
-                    // LIMIT = min( floor(FRAGMENTLOCATION / 2), 10
-                    FactSystem.SetFact(new Fact("APFragmentCounter"), Math.Min((float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation")) / 2), 10f));
-                }
-                else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 4f)
-                {
-                    // if MODE TRI
-                    // LIMIT = FRAGMENTLOCATION
-                    FactSystem.SetFact(new Fact("APFragmentCounter"), FactSystem.GetFact(new Fact("APFragmentLocation")));
-                }
-
+                SetFragmentLimits();
             }
         }
         orig(player);
+    }
+
+    public static void SetFragmentLimits()
+    {
+        if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
+        {
+            // if MODE H-TRI
+            // LIMIT = floor(FRAGMENTLOCATION / 2)
+            FactSystem.SetFact(new Fact("APFragmentLimit"), (float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation")) / 2));
+        }
+        else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 3f)
+        {
+            // if MODE BALANCED HALF-TRI
+            // LIMIT = min( floor(FRAGMENTLOCATION / 2), 10
+            FactSystem.SetFact(new Fact("APFragmentLimit"), Math.Min((float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation")) / 2), 10f));
+        }
+        else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 4f)
+        {
+            // if MODE TRI
+            // LIMIT = FRAGMENTLOCATION
+            FactSystem.SetFact(new Fact("APFragmentLimit"), FactSystem.GetFact(new Fact("APFragmentLocation")));
+        }
     }
 
     /// <summary>
@@ -401,7 +437,7 @@ public partial class Program
             return;
         }
         var ability_name = Enum.GetName(typeof(AbilityKind), interactionCharacter.Ability);
-        var ability_location = $"Ability {ability_name}";
+        var ability_location = $"{GetAbilityName(ability_name)} Purchase";
         UnityMainThreadDispatcher.Instance().log("AP sending Ability: (" + ability_location + ")");
         ApDebugLog.Instance.DisplayMessage($"Ability Got: {ability_name}");
         var cost = MetaProgression.Instance.GetEntry(interactionCharacter.Ability).cost;
@@ -442,9 +478,13 @@ public partial class Program
                 self.State.SwitchState<InteractableCharacter.HasInteractionState>();
             }
             // If the character has an unlock interaction and The ability location is not unlocked
-            else if (self.unlockInteraction != null && !connection!.IsLocationChecked($"Ability {abilityName}"))
+            else if (self.unlockInteraction != null && !connection!.IsLocationChecked($"{GetAbilityName(abilityName)} Purchase"))
             {
-                self.State.SwitchState<InteractableCharacter.HasAbilityUnlockState>();
+                // fix for stupid case where Daro never leaves the hub regardless of her corresponding fact
+                if ((self.character.name == "Sage" && FactSystem.GetFact(new Fact("APSageInHub")) == 1f) || self.character.name != "Sage")
+                {
+                    self.State.SwitchState<InteractableCharacter.HasAbilityUnlockState>();
+                } 
             }
         }
     }
@@ -456,7 +496,10 @@ public partial class Program
 
         if (self.character.HasAbilityUnlock && connection!= null)
         {
-            connection.SendHintedLocation($"Ability {abilityName}");
+            if ((self.character.name == "Sage" && FactSystem.GetFact(new Fact("APSageInHub")) == 1f) || self.character.name != "Sage")
+            {
+                connection.SendHintedLocation($"{GetAbilityName(abilityName)} Purchase");
+            }
         }
         orig(self);
     }
@@ -499,7 +542,7 @@ public class ApLogFilter : EnumSetting<APFilterMode>, IExposedSetting
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Filter");
     public string GetCategory() => "AP";
 
-    public override List<LocalizedString> GetLocalizedChoices() => [new UnlocalizedString("All Messages"), new UnlocalizedString("Only Messages About Player"), new UnlocalizedString("Player Messages + Chat")];
+    public override List<LocalizedString> GetLocalizedChoices() => [new UnlocalizedString("All Messages"), new UnlocalizedString("Only Messages About Player"), new UnlocalizedString("Messages About Player + Chat")];
 
 }
 

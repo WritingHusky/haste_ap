@@ -46,30 +46,30 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got a filler item");
                         ApDebugLog.Instance.DisplayMessage("Got Filler");
                         break;
-                    case "Slomo":
+                    case "Wraith's Hourglass":
                         UnityMainThreadDispatcher.Instance().log("AP Got Abilty Slomo");
-                        ApDebugLog.Instance.DisplayMessage("Got Slomo");
+                        ApDebugLog.Instance.DisplayMessage("Got Wraith's Hourglass");
                         FactSystem.SetFact(MetaProgression.SlomoUnlocked, 1f);
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         break;
-                    case "Grapple":
+                    case "Heir's Javelin":
                         UnityMainThreadDispatcher.Instance().log("AP Got Abilty Grapple");
-                        ApDebugLog.Instance.DisplayMessage("Got Grapple");
+                        ApDebugLog.Instance.DisplayMessage("Got Heir's Javelin");
                         FactSystem.SetFact(MetaProgression.GrappleUnlocked, 1f);
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         break;
-                    case "Fly":
+                    case "Sage's Cowl":
                         UnityMainThreadDispatcher.Instance().log("AP Got Abilty Fly");
-                        ApDebugLog.Instance.DisplayMessage("Got Fly");
+                        ApDebugLog.Instance.DisplayMessage("Got Sage's Cowl");
                         FactSystem.SetFact(MetaProgression.FlyUnlocked, 1f);
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         break;
                     case "Wraith":
                         UnityMainThreadDispatcher.Instance().log("AP Got Wraith");
-                        ApDebugLog.Instance.DisplayMessage("Got Wraith");
+                        ApDebugLog.Instance.DisplayMessage("Got Wraith in hub");
                         FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
@@ -79,7 +79,7 @@ namespace Integration
                         break;
                     case "Niada":
                         UnityMainThreadDispatcher.Instance().log("AP Got Niada");
-                        ApDebugLog.Instance.DisplayMessage("Got Niada");
+                        ApDebugLog.Instance.DisplayMessage("Got Niada in hub");
                         FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
@@ -89,7 +89,7 @@ namespace Integration
                         break;
                     case "Daro":
                         UnityMainThreadDispatcher.Instance().log("AP Got Daro");
-                        ApDebugLog.Instance.DisplayMessage("Got Daro");
+                        ApDebugLog.Instance.DisplayMessage("Got Daro in hub");
                         FactSystem.SetFact(new Fact("APSageInHub"), 1f);
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
@@ -116,6 +116,11 @@ namespace Integration
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
                             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
                         }
+                        break;
+                    case "Progressive Speed Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Progressive Speed Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Progressive Speed Upgrade");
+                        FactSystem.AddToFact(new Fact("APSpeedUpgradesCollected"), 1f);
                         break;
                     case "Anti-Spark 10 bundle":
                         UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 10 bundle");
@@ -227,6 +232,22 @@ namespace Integration
             }
             // still not sure this works but we'll try it anyway
             FactSystem.SetFact(new Fact("main_story_progress"), 6f);
+        }
+
+        public static string GetAbilityName(string internalname)
+        {
+            switch (internalname)
+            {
+                case "Slomo":
+                    return "Wraith's Hourglass";
+                case "Grapple":
+                    return "Heir's Javelin";
+                case "Fly":
+                    return "Sage's Cowl";
+                default:
+                    return "NOT FOUND";
+
+            }
         }
     }
 }

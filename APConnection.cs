@@ -1,5 +1,6 @@
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
+using Archipelago.MultiClient.Net.Colors;
 using Archipelago.MultiClient.Net.Enums;
 using Landfall.Haste;
 using UnityEngine.Purchasing.MiniJSON;
@@ -101,10 +102,31 @@ public class Connection(string hostname, int port)
                 if (FactSystem.GetFact(new Fact("APShopsanityShard8")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard8"), 0f);
                 if (FactSystem.GetFact(new Fact("APShopsanityShard9")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard9"), 0f);
                 if (FactSystem.GetFact(new Fact("APShopsanityShard10")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard10"), 0f);
+
+
+                if (loginSuccess.SlotData.TryGetValue("Per-Shard Shopsanity Quantity", out object PSShopsanityQuantity))
+                {
+                    UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {PSShopsanityQuantity}");
+                    FactSystem.SetFact(new Fact("APShopsanityQuantity"), Convert.ToSingle(PSShopsanityQuantity));
+                }
+                else
+                {
+                    UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanityQuantity from slot data:" + loginSuccess.SlotData.toJson());
+                }
             }
             else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
             {
                 if (FactSystem.GetFact(new Fact("APShopsanityGlobal")) == 0f) FactSystem.SetFact(new Fact("APShopsanityGlobal"), 0f);
+
+                if (loginSuccess.SlotData.TryGetValue("Global Shopsanity Quantity", out object GlobalShopsanityQuantity))
+                {
+                    UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {GlobalShopsanityQuantity}");
+                    FactSystem.SetFact(new Fact("APShopsanityQuantity"), Convert.ToSingle(GlobalShopsanityQuantity));
+                }
+                else
+                {
+                    UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanityQuantity from slot data:" + loginSuccess.SlotData.toJson());
+                }
             }
         }
         else
@@ -113,31 +135,36 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
-        if (loginSuccess.SlotData.TryGetValue("Shopsanity Quantity", out object ShopsanityQuantity))
-        {
-            UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {ShopsanityQuantity}");
-            FactSystem.SetFact(new Fact("APShopsanityQuantity"), Convert.ToSingle(ShopsanityQuantity));
-        }
-        else
-        {
-            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanityQuantity from slot data:" + loginSuccess.SlotData.toJson());
-            // Might default the value here to make things consistant
-        }
 
         if (loginSuccess.SlotData.TryGetValue("NPC Shuffle", out object NPCShuffle))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found NPC Shuffle in slot data with value: {NPCShuffle}");
             FactSystem.SetFact(new Fact("APNPCShuffle"), Convert.ToSingle(NPCShuffle));
-            if (FactSystem.GetFact(new Fact("APCaptainInHub")) == 0f) FactSystem.SetFact(new Fact("APCaptainInHub"), 0f);
-            if (FactSystem.GetFact(new Fact("APHeirInHub")) == 0f) FactSystem.SetFact(new Fact("APHeirInHub"), 0f);
-            if (FactSystem.GetFact(new Fact("APWraithInHub")) == 0f) FactSystem.SetFact(new Fact("APWraithInHub"), 0f);
-            if (FactSystem.GetFact(new Fact("APFashionInHub")) == 0f) FactSystem.SetFact(new Fact("APFashionInHub"), 0f);
-            if (FactSystem.GetFact(new Fact("APSageInHub")) == 0f) FactSystem.SetFact(new Fact("APSageInHub"), 0f);
+            if (Convert.ToSingle(NPCShuffle) == 1)
+            {
+                if (FactSystem.GetFact(new Fact("APCaptainInHub")) == 0f) FactSystem.SetFact(new Fact("APCaptainInHub"), 0f);
+                if (FactSystem.GetFact(new Fact("APHeirInHub")) == 0f) FactSystem.SetFact(new Fact("APHeirInHub"), 0f);
+                if (FactSystem.GetFact(new Fact("APWraithInHub")) == 0f) FactSystem.SetFact(new Fact("APWraithInHub"), 0f);
+                if (FactSystem.GetFact(new Fact("APFashionInHub")) == 0f) FactSystem.SetFact(new Fact("APFashionInHub"), 0f);
+                if (FactSystem.GetFact(new Fact("APSageInHub")) == 0f) FactSystem.SetFact(new Fact("APSageInHub"), 0f);
+            } else
+            {
+                // rather safe than sorry
+                FactSystem.SetFact(new Fact("APCaptainInHub"), 1f);
+                FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
+                FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
+                FactSystem.SetFact(new Fact("APFashionInHub"), 1f);
+                FactSystem.SetFact(new Fact("APSageInHub"), 1f);
+            }
         }
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get NPCShuffle from slot data:" + loginSuccess.SlotData.toJson());
-            // Might default the value here to make things consistant
+            FactSystem.SetFact(new Fact("APCaptainInHub"), 1f);
+            FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
+            FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
+            FactSystem.SetFact(new Fact("APFashionInHub"), 1f);
+            FactSystem.SetFact(new Fact("APSageInHub"), 1f);
         }
 
 
@@ -149,7 +176,7 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShardGoal from slot data:" + loginSuccess.SlotData.toJson());
-            // Might default the value here to make things consistant
+            FactSystem.SetFact(new Fact("APShardGoal"), 10f);
         }
 
 
@@ -161,9 +188,6 @@ public class Connection(string hostname, int port)
             {
                 loginSuccess.SlotData.TryGetValue("Linear Fragmentsanity Rate", out object LFR);
                 if (FactSystem.GetFact(new Fact("APFragmentLimit")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimit"), Convert.ToSingle(LFR));
-            } else
-            {
-                if (FactSystem.GetFact(new Fact("APFragmentLimit")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimit"), 1f);
             }
             if (FactSystem.GetFact(new Fact("APFragmentCounter")) == 0f) FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
         }
@@ -175,6 +199,21 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APFragmentLimit"), 0f);
         }
 
+        if (loginSuccess.SlotData.TryGetValue("Speed Upgrades", out object SpeedUpgrades))
+        {
+
+            UnityMainThreadDispatcher.Instance().log($"AP found SpeedUpgrades in slot data with value: {SpeedUpgrades}");
+            FactSystem.SetFact(new Fact("APSpeedUpgrades"), Convert.ToSingle(SpeedUpgrades));
+            if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1f)
+            {
+                if (FactSystem.GetFact(new Fact("APSpeedUpgradesCollected")) == 0f) FactSystem.SetFact(new Fact("APSpeedUpgradesCollected"), 0f);
+            }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get SpeedUpgrades from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APSpeedUpgrades"), 0f);
+        }
 
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))
         {
@@ -201,8 +240,8 @@ public class Connection(string hostname, int port)
         // get the AP Debug Log settings.
         // normally this value gets set when you toggle the settings from the menu, however the initial value from previous sessions needs to be loaded manually at the start for it to take effect
         var settingsHandler = GameHandler.Instance.SettingsHandler;
-        var EnabledLog = settingsHandler.GetSetting<ApDebugEnabledSetting>().Value;
-        FactSystem.SetFact(new Fact("APDebugLogEnabled"), EnabledLog ? 1f : 0f);
+        FactSystem.SetFact(new Fact("APDebugLogEnabled"), settingsHandler.GetSetting<ApDebugEnabledSetting>().Value ? 1f : 0f);
+        FactSystem.SetFact(new Fact("APMessageFilter"), (float)settingsHandler.GetSetting<ApLogFilter>().Value);
 
 
         // SaveSystem.Save();

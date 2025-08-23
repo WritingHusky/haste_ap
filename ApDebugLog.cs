@@ -1,6 +1,7 @@
 using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.MessageLog.Messages;
 using Archipelago.MultiClient.Net.MessageLog.Parts;
+using Archipelago.MultiClient.Net.Colors;
 using Landfall.Haste;
 using System.Media;
 using TMPro;
@@ -27,7 +28,7 @@ public class ApDebugLog : MonoBehaviour
     public FontMode fontMode = FontMode.GameFont;
     public OutlineMode outlineMode = OutlineMode.Outline;
     public float _duration = 7f;
-    private TMP_FontAsset _fontAsset = null!;
+    private TMP_FontAsset _fontAsset = Resources.FindObjectsOfTypeAll<TMP_FontAsset>().FirstOrDefault(font => font.name == "AkzidenzGroteskPro-Bold SDF");
 
     private Canvas? _canvas;
 
@@ -63,27 +64,29 @@ public class ApDebugLog : MonoBehaviour
         canvasScaler.referenceResolution = new Vector2(Screen.width, Screen.height);
     }
 
-    public void RecreateUI()
+    public void BuildFont()
     {
         if (fontMode == FontMode.GameFont && _fontAsset == null)
         {
             _fontAsset = Resources.FindObjectsOfTypeAll<TMP_FontAsset>()
                 .FirstOrDefault(font => font.name == "AkzidenzGroteskPro-Bold SDF");
 
-            UnityMainThreadDispatcher.Instance().log(_fontAsset != null
+            UnityMainThreadDispatcher.Instance().logError(_fontAsset != null
                 ? $"Font asset found: {_fontAsset.name}"
                 : "Font asset not found. Using default font.");
-        }
 
+        }
     }
 
 
     public void DisplayMessage(LogMessage message, float duration = -1f, bool isDebug = false)
     {
         string final = "";
+        int mpcount = 0;
         bool showMessage = false;
         foreach (MessagePart m in message.Parts)
         {
+            mpcount++;
             if (FactSystem.GetFact(new Fact("APMessageFilter")) >= 1f)
             {
                 if (m is PlayerMessagePart mp)
@@ -93,26 +96,48 @@ public class ApDebugLog : MonoBehaviour
                         showMessage = true;
                     }
                 }
-                // if filter == 2f
-                // TODO: figure out how to tell if this message is just a chat; probably just has one part
             }
             else
             {
                 showMessage = true;
             }
-            // brightens some of the darker colours without overkilling the brighter ones
-            float r = m.Color.R / 255f;
-            float g = m.Color.G / 255f;
-            float b = m.Color.B / 255f;
+            float r = 0f;
+            float g = 0f;
+            float b = 0f;
+            if (m.PaletteColor == PaletteColor.Plum)
+            {
+                // fix the progressive item colour cuz its shit
+                r = 175f / 255f;
+                g = 153f / 255f;
+                b = 239f / 255f;
+            } else if (m.PaletteColor == PaletteColor.SlateBlue)
+            {
+                // fix the useful item colour cuz its shit
+                r = 109f / 255f;
+                g = 139f / 255f;
+                b = 232f / 255f;
+            }
+            else
+            {
+                // brightens some of the darker colours without overkilling the brighter ones
+                r = m.Color.R / 255f;
+                g = m.Color.G / 255f;
+                b = m.Color.B / 255f;
 
-            float brightness = 0.299f * r + 0.587f * g + 0.114f * b;
-            float factor = 1f + (0.6f * (1f - brightness));
+                float brightness = 0.299f * r + 0.587f * g + 0.114f * b;
+                float factor = 1f + (0.6f * (1f - brightness));
 
-            r = Math.Min(r * factor, 1f);
-            g = Math.Min(g * factor, 1f);
-            b = Math.Min(b * factor, 1f);
+                r = Math.Min(r * factor, 1f);
+                g = Math.Min(g * factor, 1f);
+                b = Math.Min(b * factor, 1f);
 
+
+            }
             final += $"<color=#{(int)(r*255):X2}{(int)(g * 255):X2}{(int)(b * 255):X2}>{m.Text}</color> ";
+        }
+        if (FactSystem.GetFact(new Fact("APMessageFilter")) >= 2f && mpcount == 1)
+        {
+            showMessage = true;
         }
         if (showMessage) DisplayMessage(final, duration, isDebug);
     }
@@ -144,13 +169,15 @@ public class ApDebugLog : MonoBehaviour
                 textComponent.text = message;
                 textComponent.fontSize = fontSize;
                 textComponent.alignment = TextAlignmentOptions.Left;
-                textComponent.outlineColor = Color.black;
-                textComponent.outlineWidth = 2;
 
                 if (fontMode == FontMode.GameFont && _fontAsset != null)
                 {
                     textComponent.font = _fontAsset;
+                    textComponent.fontSharedMaterial = _fontAsset.material;
                 }
+
+                textComponent.outlineColor = Color.black;
+                textComponent.outlineWidth = 0.5f;
 
                 RectTransform rectTransform = messageObject.GetComponent<RectTransform>();
                 rectTransform.sizeDelta = new Vector2(600, 50); // Initial size, will adjust later
