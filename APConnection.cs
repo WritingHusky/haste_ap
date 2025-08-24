@@ -190,6 +190,10 @@ public class Connection(string hostname, int port)
                 if (FactSystem.GetFact(new Fact("APFragmentLimit")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimit"), Convert.ToSingle(LFR));
             }
             if (FactSystem.GetFact(new Fact("APFragmentCounter")) == 0f) FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
+            
+            loginSuccess.SlotData.TryGetValue("Fragmentsanity Quantity", out object FQ);
+            FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), Convert.ToSingle(FQ));
+
         }
         else
         {
@@ -197,6 +201,7 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APFragmentsanity"), 0f);
             FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
             FactSystem.SetFact(new Fact("APFragmentLimit"), 0f);
+            FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), 0f);
         }
 
         if (loginSuccess.SlotData.TryGetValue("Speed Upgrades", out object SpeedUpgrades))
@@ -223,7 +228,6 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get DefaultOutfitBody from slot data:" + loginSuccess.SlotData.toJson());
-            // Might default the value here to make things consistant
         }
 
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Hat", out object DefSkinHat))
@@ -234,7 +238,6 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get DefaultOutfitHat from slot data:" + loginSuccess.SlotData.toJson());
-            // Might default the value here to make things consistant
         }
 
         // get the AP Debug Log settings.

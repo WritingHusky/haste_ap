@@ -50,7 +50,6 @@ public partial class Program
             ApDebugLog.Instance.DisplayMessage("AP Disabled");
 
             UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
-            FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
             orig();
             return;
         }
@@ -292,8 +291,8 @@ public partial class Program
             ApDebugLog.Instance.DisplayMessage("AP On Fragment Clear the connection is null");
             return;
         }
-        // make sure youre actually in a fragment, not a rest/shop/challenge
-        if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge())
+        // make sure youre actually in a fragment, not a rest/shop/challenge APFragmentsanityQuantity
+        if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge() && (FactSystem.GetFact(new Fact("APFragmentLocation")) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity"))))
         {
             FactSystem.AddToFact(new Fact("APFragmentCounter"), 1f);
             ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentCounter"))}/{FactSystem.GetFact(new Fact("APFragmentLimit"))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1}", isDebug:false);
@@ -314,19 +313,19 @@ public partial class Program
         {
             // if MODE H-TRI
             // LIMIT = floor(FRAGMENTLOCATION / 2)
-            FactSystem.SetFact(new Fact("APFragmentLimit"), (float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation")) / 2));
+            FactSystem.SetFact(new Fact("APFragmentLimit"), Math.Max((float)Math.Floor((FactSystem.GetFact(new Fact("APFragmentLocation")) + 1) / 2), 1f));
         }
         else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 3f)
         {
             // if MODE BALANCED HALF-TRI
             // LIMIT = min( floor(FRAGMENTLOCATION / 2), 10
-            FactSystem.SetFact(new Fact("APFragmentLimit"), Math.Min((float)Math.Floor(FactSystem.GetFact(new Fact("APFragmentLocation")) / 2), 10f));
+            FactSystem.SetFact(new Fact("APFragmentLimit"), Math.Max(Math.Min((float)Math.Floor((FactSystem.GetFact(new Fact("APFragmentLocation")) + 1) / 2), 10f), 1f));
         }
         else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 4f)
         {
             // if MODE TRI
             // LIMIT = FRAGMENTLOCATION
-            FactSystem.SetFact(new Fact("APFragmentLimit"), FactSystem.GetFact(new Fact("APFragmentLocation")));
+            FactSystem.SetFact(new Fact("APFragmentLimit"), FactSystem.GetFact(new Fact("APFragmentLocation")) + 1);
         }
     }
 
@@ -494,7 +493,7 @@ public partial class Program
         var ability = self.character.Ability;
         var abilityName = Enum.GetName(typeof(AbilityKind), ability);
 
-        if (self.character.HasAbilityUnlock && connection!= null)
+        if (self.character.HasAbilityUnlock && connection!= null && FactSystem.GetFact(new Fact("in_run")) == 0)
         {
             if ((self.character.name == "Sage" && FactSystem.GetFact(new Fact("APSageInHub")) == 1f) || self.character.name != "Sage")
             {

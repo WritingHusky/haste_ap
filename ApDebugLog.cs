@@ -133,7 +133,7 @@ public class ApDebugLog : MonoBehaviour
 
 
             }
-            final += $"<color=#{(int)(r*255):X2}{(int)(g * 255):X2}{(int)(b * 255):X2}>{m.Text}</color> ";
+            final += $"<color=#{(int)(r*255):X2}{(int)(g * 255):X2}{(int)(b * 255):X2}>{m.Text}</color>";
         }
         if (FactSystem.GetFact(new Fact("APMessageFilter")) >= 2f && mpcount == 1)
         {
