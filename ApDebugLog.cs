@@ -28,6 +28,7 @@ public class ApDebugLog : MonoBehaviour
     public FontMode fontMode = FontMode.GameFont;
     public OutlineMode outlineMode = OutlineMode.Outline;
     public float _duration = 7f;
+    public bool messagesGoDown = true;
     private TMP_FontAsset _fontAsset = Resources.FindObjectsOfTypeAll<TMP_FontAsset>().FirstOrDefault(font => font.name == "AkzidenzGroteskPro-Bold SDF");
 
     private Canvas? _canvas;
@@ -217,7 +218,7 @@ public class ApDebugLog : MonoBehaviour
             {
                 RectTransform activeRect = activeMessages[i].MessageObject.GetComponent<RectTransform>();
                 activeRect.anchoredPosition = new Vector2(xBaseOffset, currentYOffset);
-                currentYOffset -= activeMessages[i].Height + lineSpacing;
+                currentYOffset += (activeMessages[i].Height + lineSpacing) * (messagesGoDown ? -1 : 1);
             }
         }
     }

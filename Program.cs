@@ -585,6 +585,17 @@ public class ApLogLineSpacing : IntSetting, IExposedSetting
 }
 
 [HasteSetting]
+public class ApLogDirection : BoolSetting, IExposedSetting
+{
+    public override LocalizedString OffString => new UnlocalizedString("Messages go up");
+    public override LocalizedString OnString => new UnlocalizedString("Messages go down");
+    public override void ApplyValue() => ApDebugLog.Instance.messagesGoDown = Value;
+    protected override bool GetDefaultValue() => true;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Message Direction");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
 public class ApLogTestMessage : ButtonSetting, IExposedSetting
 {
     public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Example Message");
