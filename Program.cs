@@ -23,7 +23,7 @@ public partial class Program
         ApDebugLog.Instance.BuildFont();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.2.0", isDebug: false);
+        ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.2.1", isDebug: false);
 
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
@@ -82,7 +82,11 @@ public partial class Program
 
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         SetHubState();
-        SetFragmentLimits();
+        for (int i = 1; i <= 10; i++)
+        {
+            SetFragmentLimits("Shard"+i);
+        }
+        SetFragmentLimits("Global");
 
         FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
         {
@@ -291,41 +295,58 @@ public partial class Program
             ApDebugLog.Instance.DisplayMessage("AP On Fragment Clear the connection is null");
             return;
         }
-        // make sure youre actually in a fragment, not a rest/shop/challenge APFragmentsanityQuantity
-        if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge() && (FactSystem.GetFact(new Fact("APFragmentLocation")) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity"))))
+        // make sure youre actually in a fragment, not a rest/shop/challenge
+        if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge())
         {
-            FactSystem.AddToFact(new Fact("APFragmentCounter"), 1f);
-            ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentCounter"))}/{FactSystem.GetFact(new Fact("APFragmentLimit"))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1}", isDebug:false);
-            if (FactSystem.GetFact(new Fact("APFragmentCounter")) == FactSystem.GetFact(new Fact("APFragmentLimit")))
+            string? locationName; // location to send
+            string? FragKeyword; // suffix to put on everything
+            if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 1f)
             {
-                connection.SendLocation("Fragment Clear " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentLocation"))) + 1));
-                FactSystem.AddToFact(new Fact("APFragmentLocation"), 1f);
-                FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
-                SetFragmentLimits();
+                var currentShard = RunHandler.RunData.shardID + 1;
+                locationName = $"Shard {currentShard} Fragment Clear ";
+                FragKeyword = "Shard" + currentShard;
+            } else
+            {
+                locationName = "Global Fragment Clear ";
+                FragKeyword = "Global";
             }
+
+            if (FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword)) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity")))
+            {
+                FactSystem.AddToFact(new Fact("APFragmentsanity" + FragKeyword), 1f);
+                ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword))}/{FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword))) + 1}", isDebug: false);
+                if (FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword)) == FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword)))
+                {
+                    connection.SendLocation(locationName + (Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword))) + 1).ToString("D2"));
+                    FactSystem.AddToFact(new Fact("APFragmentsanityLocation" + FragKeyword), 1f);
+                    FactSystem.SetFact(new Fact("APFragmentsanity" + FragKeyword), 0f);
+                    SetFragmentLimits(FragKeyword);
+                }
+            }
+
         }
         orig(player);
     }
 
-    public static void SetFragmentLimits()
+    public static void SetFragmentLimits(string keyword)
     {
         if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
         {
             // if MODE H-TRI
             // LIMIT = floor(FRAGMENTLOCATION / 2)
-            FactSystem.SetFact(new Fact("APFragmentLimit"), Math.Max((float)Math.Floor((FactSystem.GetFact(new Fact("APFragmentLocation")) + 1) / 2), 1f));
+            FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), Math.Max((float)Math.Floor((FactSystem.GetFact(new Fact($"APFragmentsanityLocation{keyword}")) + 1) / 2), 1f));
         }
         else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 3f)
         {
             // if MODE BALANCED HALF-TRI
             // LIMIT = min( floor(FRAGMENTLOCATION / 2), 10
-            FactSystem.SetFact(new Fact("APFragmentLimit"), Math.Max(Math.Min((float)Math.Floor((FactSystem.GetFact(new Fact("APFragmentLocation")) + 1) / 2), 10f), 1f));
+            FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), Math.Max(Math.Min((float)Math.Floor((FactSystem.GetFact(new Fact($"APFragmentsanityLocation{keyword}")) + 1) / 2), 10f), 1f));
         }
         else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 4f)
         {
             // if MODE TRI
             // LIMIT = FRAGMENTLOCATION
-            FactSystem.SetFact(new Fact("APFragmentLimit"), FactSystem.GetFact(new Fact("APFragmentLocation")) + 1);
+            FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), FactSystem.GetFact(new Fact($"APFragmentsanityLocation{keyword}")) + 1);
         }
     }
 
@@ -344,12 +365,12 @@ public partial class Program
         if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
         {
             var currentShard = RunHandler.RunData.shardID + 1;
-            item_location = "Shard " + currentShard + " Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1);
+            item_location = "Shard " + currentShard + " Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
             FactSystem.AddToFact(new Fact("APShopsanityShard" + currentShard), 1f);
             canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
         } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
         {
-            item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1);
+            item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1).ToString("D3");
             FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
             canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
         }
@@ -382,7 +403,6 @@ public partial class Program
         UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");
         ApDebugLog.Instance.DisplayMessage("Boss Defeated");
 
-        // TODO add handling for numeral boss locations
         if (currentShard == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal")))){
             ApDebugLog.Instance.DisplayMessage("Game Complete");
             connection.CompleteGame();

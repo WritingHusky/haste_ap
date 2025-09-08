@@ -74,6 +74,23 @@ public class Connection(string hostname, int port)
         }
         deathLinkService = session.CreateDeathLinkService();
 
+        // workshop only gives access to the latest mod version, so i'll need to have backwards compat eventually
+        if (loginSuccess.SlotData.TryGetValue("Version", out object VersionNum))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found Version in slot data with value: {VersionNum}");
+            string[] subs = VersionNum.ToString().Split('.');
+            FactSystem.SetFact(new Fact("APVersionMajor"), Convert.ToSingle(int.Parse(subs[0])));
+            FactSystem.SetFact(new Fact("APVersionMiddle"), Convert.ToSingle(int.Parse(subs[1])));
+            FactSystem.SetFact(new Fact("APVersionMinor"), Convert.ToSingle(int.Parse(subs[2])));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get Version from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APVersionMajor"), Convert.ToSingle(0));
+            FactSystem.SetFact(new Fact("APVersionMiddle"), Convert.ToSingle(2));
+            FactSystem.SetFact(new Fact("APVersionMinor"), Convert.ToSingle(0));
+        }
+
         if (loginSuccess.SlotData.TryGetValue("ForceReload", out object ForceReload))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found ForceReload in slot data with value: {ForceReload}");
@@ -91,19 +108,6 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APShopsanity"), Convert.ToSingle(Shopsanity));
             if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
             {
-                // this looks stupid, but its so that if you reconnect and the Facts are already there, it wont override them
-                if (FactSystem.GetFact(new Fact("APShopsanityShard1")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard1"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard2")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard2"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard3")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard3"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard4")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard4"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard5")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard5"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard6")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard6"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard7")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard7"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard8")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard8"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard9")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard9"), 0f);
-                if (FactSystem.GetFact(new Fact("APShopsanityShard10")) == 0f) FactSystem.SetFact(new Fact("APShopsanityShard10"), 0f);
-
-
                 if (loginSuccess.SlotData.TryGetValue("Per-Shard Shopsanity Quantity", out object PSShopsanityQuantity))
                 {
                     UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {PSShopsanityQuantity}");
@@ -116,7 +120,6 @@ public class Connection(string hostname, int port)
             }
             else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
             {
-                if (FactSystem.GetFact(new Fact("APShopsanityGlobal")) == 0f) FactSystem.SetFact(new Fact("APShopsanityGlobal"), 0f);
 
                 if (loginSuccess.SlotData.TryGetValue("Global Shopsanity Quantity", out object GlobalShopsanityQuantity))
                 {
@@ -184,23 +187,46 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().log($"AP found Fragmentsanity in slot data with value: {Fragmentsanity}");
             FactSystem.SetFact(new Fact("APFragmentsanity"), Convert.ToSingle(Fragmentsanity));
-            if (Convert.ToSingle(Fragmentsanity) == 1f)
+
+            if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 1f)
+            {
+                loginSuccess.SlotData.TryGetValue("Per-Shard Fragmentsanity Quantity", out object FQ);
+                FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), Convert.ToSingle(FQ));
+
+            } else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
+            {
+                if (FactSystem.GetFact(new Fact("APFragmentsanityGlobal")) == 0f) FactSystem.SetFact(new Fact("APFragmentsanityGlobal"), 0f);
+
+                loginSuccess.SlotData.TryGetValue("Global Fragmentsanity Quantity", out object FQ);
+                FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), Convert.ToSingle(FQ));
+
+            }
+
+            loginSuccess.SlotData.TryGetValue("Fragmentsanity Distribution", out object FragmentsanityDist);
+            UnityMainThreadDispatcher.Instance().log($"AP found Fragmentsanity Distribution in slot data with value: {FragmentsanityDist}");
+            FactSystem.SetFact(new Fact("APFragmentsanityDistribution"), Convert.ToSingle(FragmentsanityDist));
+            if (Convert.ToSingle(FragmentsanityDist) == 1f)
             {
                 loginSuccess.SlotData.TryGetValue("Linear Fragmentsanity Rate", out object LFR);
-                if (FactSystem.GetFact(new Fact("APFragmentLimit")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimit"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard1")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard1"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard2")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard2"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard3")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard3"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard4")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard4"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard5")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard5"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard6")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard6"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard7")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard7"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard8")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard8"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard9")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard9"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitShard10")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard10"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFragmentLimitGlobal")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitGlobal"), Convert.ToSingle(LFR));
             }
-            if (FactSystem.GetFact(new Fact("APFragmentCounter")) == 0f) FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
             
-            loginSuccess.SlotData.TryGetValue("Fragmentsanity Quantity", out object FQ);
-            FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), Convert.ToSingle(FQ));
-
         }
         else
         {
-            UnityMainThreadDispatcher.Instance().logError("AP Failed to get FragmentLocations from slot data:" + loginSuccess.SlotData.toJson());
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get Fragmentsanity from slot data:" + loginSuccess.SlotData.toJson());
             FactSystem.SetFact(new Fact("APFragmentsanity"), 0f);
-            FactSystem.SetFact(new Fact("APFragmentCounter"), 0f);
-            FactSystem.SetFact(new Fact("APFragmentLimit"), 0f);
+            FactSystem.SetFact(new Fact("APFragmentsanityDistribution"), 0f);
             FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), 0f);
         }
 
@@ -287,6 +313,7 @@ public class Connection(string hostname, int port)
         UnityMainThreadDispatcher.Instance().log("AP Disconnecting");
         session.Socket.DisconnectAsync();
         UnityMainThreadDispatcher.Instance().log("AP Disconnected");
+        ApDebugLog.Instance.DisplayMessage($"AP Disconnected", isDebug:false);
     }
 
     public void BuildItemReciver(Action<string> GiveItem)
