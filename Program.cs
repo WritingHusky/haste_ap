@@ -96,9 +96,14 @@ public partial class Program
 
             var shard_count = connection.GetItemCount("Progressive Shard");
             // Never allow the value to be not what I want it to be
-            if (value != shard_count)
+            if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
             {
-                FactSystem.SetFact(new Fact("current_unbeaten_shard"), shard_count);
+                var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
+                // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
+                if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), newvalue);
+            } else
+            {
+                if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), shard_count);
             }
         });
 
@@ -311,7 +316,7 @@ public partial class Program
                 FragKeyword = "Global";
             }
 
-            if (FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword)) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity")))
+            if (FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword)) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity")))
             {
                 FactSystem.AddToFact(new Fact("APFragmentsanity" + FragKeyword), 1f);
                 ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword))}/{FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword))) + 1}", isDebug: false);
@@ -398,6 +403,7 @@ public partial class Program
             return;
         }
         var currentShard = RunHandler.RunData.shardID + 1;
+        FactSystem.SetFact(new Fact("APBossDefeated"), Math.Max(FactSystem.GetFact(new Fact("APBossDefeated")), currentShard));
 
         var boss_location = "Shard " + currentShard + " Boss";
         UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");

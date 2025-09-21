@@ -14,6 +14,12 @@ namespace Integration
         public static void UpdateShardCount()
         {
             var _shardCount = connection!.GetItemCount("Progressive Shard");
+            if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
+            {
+                // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
+                _shardCount = Math.Min(_shardCount, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
+                UnityMainThreadDispatcher.Instance().log("AP ShardUnlock is set to bosses, new count: " + _shardCount);
+            } 
             UnityMainThreadDispatcher.Instance().log("AP unlocked to shard: " + _shardCount);
             // Change the connection data first as this value is checked on factsystem update
             PlayerProgress.UnlockToShard(_shardCount);

@@ -102,6 +102,17 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
+        if (loginSuccess.SlotData.TryGetValue("Shard Unlock Order", out object ShardUnlockOrder))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found ShardUnlockOrder in slot data with value: {ShardUnlockOrder}");
+            FactSystem.SetFact(new Fact("APShardUnlockOrder"), Convert.ToSingle(ShardUnlockOrder));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShardUnlockOrder from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APShardUnlockOrder"), 0f);
+        }
+
         if (loginSuccess.SlotData.TryGetValue("Shopsanity", out object Shopsanity))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found Shopsanity in slot data with value: {Shopsanity}");
