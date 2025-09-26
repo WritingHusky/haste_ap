@@ -572,6 +572,73 @@ public class ApLogFilter : EnumSetting<APFilterMode>, IExposedSetting
 }
 
 [HasteSetting]
+public class ApLogXOffset : IntSetting, IExposedSetting
+{
+    public override void ApplyValue() => ApDebugLog.Instance.xBaseOffset = Value;
+    protected override int GetDefaultValue() => -650;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client X Offset");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApLogYOffset : IntSetting, IExposedSetting
+{
+    public override void ApplyValue() => ApDebugLog.Instance.yBaseOffset = Value;
+    protected override int GetDefaultValue() => 150;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Y Offset");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApLogFontSize : IntSetting, IExposedSetting
+{
+    public override void ApplyValue()
+    {
+        ApDebugLog.Instance.fontSize = Value;
+    }
+    protected override int GetDefaultValue() => 16;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Font Size");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApLogLineSpacing : IntSetting, IExposedSetting
+{
+    public override void ApplyValue() => ApDebugLog.Instance.lineSpacing = Value;
+    protected override int GetDefaultValue() => 20;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Line Spacing");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApLogDirection : BoolSetting, IExposedSetting
+{
+    public override LocalizedString OffString => new UnlocalizedString("Messages go up");
+    public override LocalizedString OnString => new UnlocalizedString("Messages go down");
+    public override void ApplyValue() => ApDebugLog.Instance.messagesGoDown = Value;
+    protected override bool GetDefaultValue() => true;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Message Direction");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
+public class ApLogTestMessage : ButtonSetting, IExposedSetting
+{
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Example Message");
+    public string GetCategory() => "AP";
+
+    public override void OnClicked(ISettingHandler settingHandler)
+    {
+        ApDebugLog.Instance.DisplayMessage("This is a test message that is really long so that way you can make sure the text appears on screen correctly.", isDebug: false);
+    }
+
+    public override string GetButtonText()
+    {
+        return "Show Example Message";
+    }
+}
+
+[HasteSetting]
 public class ApServerNameSetting : StringSetting, IExposedSetting
 {
     public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"New AP hostname {Value}");
