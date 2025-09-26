@@ -19,16 +19,21 @@ public class ApDebugLog : MonoBehaviour
     public static ApDebugLog Instance { get; private set; } = null!;
 
     // public DisplayMode displayMode = DisplayMode.Always;
+
+    // This block of variables will be overwritten using values from the settings menu, these values are just fallbacks in case this fails for some reason.
+    // If you're wanting to change default values, change them in the HasteSetting instead.
     public float yBaseOffset = 150f;
     public float xBaseOffset = -650f;
     public int fontSize = 16;
     public int lineSpacing = 20;
+    public bool messagesGoDown = true;
+    // --------------------------------
+
     public AlignmentMode alignmentMode = AlignmentMode.Left;
     public ColorizedMode colorizedMode = ColorizedMode.Colorized;
     public FontMode fontMode = FontMode.GameFont;
     public OutlineMode outlineMode = OutlineMode.Outline;
     public float _duration = 7f;
-    public bool messagesGoDown = true;
     private TMP_FontAsset _fontAsset = Resources.FindObjectsOfTypeAll<TMP_FontAsset>().FirstOrDefault(font => font.name == "AkzidenzGroteskPro-Bold SDF");
 
     private Canvas? _canvas;
