@@ -1,17 +1,20 @@
 using APConnection;
-using static Integration.Integration;
+using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Landfall.Haste;
 using Landfall.Modding;
+using System.Reflection;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Localization;
 using Zorro.Settings;
-using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
-using System.Reflection;
+using static Integration.Integration;
 
 [LandfallPlugin]
 public partial class Program
 {
     private static Connection? connection;
+
+    private static readonly Version version = new(0, 2, 2);
 
     static Program()
     {
@@ -23,7 +26,7 @@ public partial class Program
         ApDebugLog.Instance.BuildFont();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage("Archiplego Installed v0.2.1", isDebug: false);
+        ApDebugLog.Instance.DisplayMessage($"Archiplego Installed v{version}", isDebug: false);
 
         // Load everything up when the games starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
@@ -71,7 +74,7 @@ public partial class Program
         connection.BuildItemReciver(GiveItem);
         connection.buildMessageReciver();
 
-        if (!connection.Connect(username, password))
+        if (!connection.Connect(username, password, version))
         {
             ApDebugLog.Instance.DisplayMessage("Connection Failed");
             return;
@@ -150,12 +153,16 @@ public partial class Program
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
+        On.Landfall.Haste.MetaProgressionRowUI.AddClicked += StaticMetaProgressionRowAddClickedHook;
+        On.PlayerStats.AddStats += StaticPlayerAddStatsHook;
+
         On.Landfall.Haste.AbilityUnlockScreen.Unlock += StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start += StaticInteractableCharacterStartHook;
         On.InteractableCharacter.Interact += StaticInteractableCharacterInteractHook;
 
         On.PlayerCharacter.RestartPlayer_Launch_Transform_float += StaticSetSpeed;
         On.PlayerCharacter.RestartPlayer_Still_Transform += StaticSetSpeed;
+
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
 
@@ -168,9 +175,40 @@ public partial class Program
         orig();
     }
 
+
+    /// <summary>
+    /// Extra function to remove hooks on exiting the game, so that new hooks arent accidentally installed ontop of existing ones
+    /// </summary>
+    private static void ClearHooks()
+    {
+        On.GM_API.OnRunEnd -= StaticCompleteRunHook;
+        On.GM_API.OnPlayerEnteredPortal -= StaticFragmentComplete;
+        On.GM_API.OnEndBossWin -= StaticEndBossHook;
+        On.GM_API.OnBossDeath -= StaticBossDeathHook;
+        On.ShopItemHandler.BuyItem -= StaticBuyItemHook;
+        On.SaveSystem.Load -= StaticSaveLoadHook;
+        On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
+        On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
+        On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
+        On.GM_API.OnSpawnedInHub -= StaticLoadHubHook;
+        On.PlayerCharacter.RestartPlayer_Launch_Transform_float -= StaticSetSpeed;
+        On.PlayerCharacter.RestartPlayer_Still_Transform -= StaticSetSpeed;
+        On.Landfall.Haste.MetaProgressionRowUI.AddClicked -= StaticMetaProgressionRowAddClickedHook;
+        On.PlayerStats.AddStats -= StaticPlayerAddStatsHook;
+        if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
+        {
+            On.Player.Die -= StaticSendDeathOnDie;
+            connection.deathLinkService!.OnDeathLinkReceived -= GiveDeath;
+            connection.deathLinkService!.DisableDeathLink();
+
+        }
+        UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
+        ApDebugLog.Instance.DisplayMessage("AP Hooks Removed");
+    }
+
     private static void StaticSetSpeed(On.PlayerCharacter.orig_RestartPlayer_Still_Transform orig, PlayerCharacter self, Transform spawnPoint)
     {
-        if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1)
+        if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1f)
         {
             SecretSetSpeed(self);
         }
@@ -179,7 +217,7 @@ public partial class Program
 
     private static void StaticSetSpeed(On.PlayerCharacter.orig_RestartPlayer_Launch_Transform_float orig, PlayerCharacter self, Transform spawnPoint, float minVel)
     {
-        if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1)
+        if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1f)
         {
             SecretSetSpeed(self);
         }
@@ -250,31 +288,6 @@ public partial class Program
         orig();
     }
 
-
-    /// <summary>
-    /// Extra function to remove hooks on exiting the game, so that new hooks arent accidentally installed ontop of existing ones
-    /// </summary>
-    private static void ClearHooks()
-    {
-        On.GM_API.OnRunEnd -= StaticCompleteRunHook;
-        On.GM_API.OnPlayerEnteredPortal -= StaticFragmentComplete;
-        On.GM_API.OnEndBossWin -= StaticEndBossHook;
-        On.GM_API.OnBossDeath -= StaticBossDeathHook;
-        On.ShopItemHandler.BuyItem -= StaticBuyItemHook;
-        On.SaveSystem.Load -= StaticSaveLoadHook;
-        On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
-        On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
-        On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
-        On.GM_API.OnSpawnedInHub -= StaticLoadHubHook;
-        On.PlayerCharacter.RestartPlayer_Launch_Transform_float -= StaticSetSpeed;
-        On.PlayerCharacter.RestartPlayer_Still_Transform -= StaticSetSpeed;
-        if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
-        {
-            On.Player.Die -= StaticSendDeathOnDie;
-
-        }
-        UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
-    }
 
     /// <summary>
     /// Hook into run completion. Used to control Player Progress
@@ -367,6 +380,7 @@ public partial class Program
         }
         var item_location = "";
         bool canSend = true;
+
         if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
         {
             var currentShard = RunHandler.RunData.shardID + 1;
@@ -378,7 +392,15 @@ public partial class Program
             item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1).ToString("D3");
             FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
             canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+        } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 0f)
+        {
+            canSend = false;
         }
+
+        // somewhere in here:
+        // if APshopsanity mode is 1 (seperate)
+        // check if the item is the AP item, then only send in that case
+        // else its a normal item that isnt granting a check and proceed as normal
 
         if (canSend)
         {
@@ -467,14 +489,162 @@ public partial class Program
         ApDebugLog.Instance.DisplayMessage($"Ability Got: {ability_name}");
         var cost = MetaProgression.Instance.GetEntry(interactionCharacter.Ability).cost;
         MetaProgression.AddResource(-cost);
-        // TODO add handling for numeral boss locations
 
         connection.SendLocation(ability_location);
         // orig();
-        // Close the window
 
+        // Close the window
         self.gameObject.SetActive(value: false);
     }
+
+    private static void StaticMetaProgressionRowAddClickedHook(On.Landfall.Haste.MetaProgressionRowUI.orig_AddClicked orig, MetaProgressionRowUI self)
+    {
+        if (connection == null)
+        {
+            ApDebugLog.Instance.DisplayMessage("AP On Meta Progression Row UI the connection is null");
+            return;
+        }
+        // this is basically just the decompiled original code with added jank lmao
+        if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
+        {
+            Type metaRowType = typeof(MetaProgressionRowUI);
+            // type reflection to get around private values being annoying 
+            FieldInfo entryField = metaRowType.GetField("_entry", BindingFlags.NonPublic | BindingFlags.Instance);
+            var entry = entryField.GetValue(self) as MetaProgression.Entry;
+
+            FieldInfo sfxField = metaRowType.GetField("sfx", BindingFlags.NonPublic | BindingFlags.Instance);
+            var sfx = sfxField.GetValue(self) as MetaProgressionSFX;
+
+            ValueTuple<int, bool, bool> costToUpgrade = entry.GetCostToUpgrade();
+            int item = costToUpgrade.Item1;
+            if (!costToUpgrade.Item2)
+            {
+                if (sfx && sfx.noMoney)
+                {
+                    sfx.noMoney.Play();
+                }
+                return;
+            }
+            if (sfx)
+            {
+                if (sfx.press)
+                {
+                    sfx.press.Play();
+                }
+                if (sfx.increase)
+                {
+                    sfx.increase.sfxs[0].settings.pitch = 1f + (float)item / 2000f;
+                    sfx.increase.Play();
+                }
+            }
+            ApDebugLog.Instance.DisplayMessage(string.Format("AP Upgrading meta progression stat {0}", self.kind), isDebug:false);
+            // TODO: make another lookup function like i do for abilities, also dont forget to add 1 to the current level
+            ApDebugLog.Instance.DisplayMessage($"Pretending to send 'Captains Upgrade: {self.kind} {entry.CurrentLevel}'", isDebug: false);
+            connection.SendLocation(GetCaptainUpgradeName(self.kind.ToString(), entry.CurrentLevel));
+            // then, instead of changing the variable, change some alternate Fact
+            int? nextLevel = entry.GetNextLevel(entry.CurrentLevel);
+            if (nextLevel != null)
+            {
+                int valueOrDefault = nextLevel.GetValueOrDefault();
+                // this next line is what needs to be changed
+                entry.CurrentLevel = valueOrDefault;
+            }
+            else
+            {
+                ApDebugLog.Instance.DisplayMessage(string.Format("Error: could not get next level for {0} (currernt level = {1}). This shouldn't happen due to checks above.", entry.fact, entry.CurrentLevel));
+            }
+            FactSystem.AddToFact(MetaProgression.MetaProgressionResource, (float)(-(float)item));
+            // how do i make it refresh the UI from here uhhhhhhh
+            SaveSystem.Save();
+
+            //FieldInfo basefield = metaRowType.GetField("base", BindingFlags.NonPublic | BindingFlags.Instance);
+            //var thebase = basefield.GetValue(self) as UnityEngine.Component;
+
+            // so this is the part that updates the antispark count UI so i kinda cant avoid this lol
+            //thebase.GetComponentInParent<MetaProgressionUI>().RefreshUI();
+            self.RefreshUI();
+
+        }
+        else
+        {
+            orig(self);
+        }
+    }
+
+
+    private static void StaticPlayerAddStatsHook(On.PlayerStats.orig_AddStats orig, PlayerStats self, PlayerStats otherStats, float multiplier)
+    {
+        if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
+        {
+            //ApDebugLog.Instance.DisplayMessage($"default health: {otherStats.maxHealth.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"default lives: {otherStats.lives.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"default energy: {otherStats.maxEnergy.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"default l sparks: {otherStats.extraLevelSparks.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"default rarity: {otherStats.itemRarity.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"default resource: {otherStats.startingResource.baseValue}");
+            float calcmaxHealth = 80f + (10 * FactSystem.GetFact(new Fact("APUpgradeMaxHealth")));
+            float calclives = 3f + FactSystem.GetFact(new Fact("APUpgradeMaxLives"));
+            // THESE next three might need some value tweaking, i think these are wrong and might need to just be 1 mults the whole way down
+            float calcmaxEnergy = 0.5f + (0.2f * FactSystem.GetFact(new Fact("APUpgradeMaxEnergy")));
+            float calcextraLevelSparks = (1 * FactSystem.GetFact(new Fact("APUpgradeLevelSparks")));
+            float calcitemRarity = (1 * FactSystem.GetFact(new Fact("APUpgradeItemRarity")));
+            float calcstartingResource = 0f;
+            switch (FactSystem.GetFact(new Fact("APUpgradeStartingSparks")))
+            {
+                case 1f:
+                    calcstartingResource = 100f;
+                    break;
+                case 2f:
+                    calcstartingResource = 250;
+                    break;
+                case 3f:
+                    calcstartingResource = 500;
+                    break;
+                default:
+                    calcstartingResource = 250f * FactSystem.GetFact(new Fact("APUpgradeStartingSparks"));
+                    break;
+            }
+            otherStats.maxHealth.baseValue = (self.maxHealth.baseValue < calcmaxHealth) ? calcmaxHealth : otherStats.maxHealth.baseValue;
+            otherStats.lives.baseValue = (self.lives.baseValue < calclives) ? calclives : otherStats.lives.baseValue;
+            otherStats.maxEnergy.baseValue = (self.maxEnergy.baseValue < calcmaxEnergy) ? calcmaxEnergy : otherStats.maxEnergy.baseValue;
+            otherStats.extraLevelSparks.baseValue = (self.extraLevelSparks.baseValue < calcextraLevelSparks) ? calcextraLevelSparks : otherStats.extraLevelSparks.baseValue;
+            otherStats.itemRarity.baseValue = (self.itemRarity.baseValue < calcitemRarity) ? calcitemRarity : otherStats.itemRarity.baseValue;
+            otherStats.startingResource.baseValue = (self.startingResource.baseValue < calcstartingResource) ? calcstartingResource : otherStats.startingResource.baseValue;
+            self.maxHealth.AddStat(otherStats.maxHealth, multiplier);
+            self.lives.AddStat(otherStats.lives, multiplier);
+            self.maxEnergy.AddStat(otherStats.maxEnergy, multiplier);
+            self.extraLevelSparks.AddStat(otherStats.extraLevelSparks, multiplier);
+            self.itemRarity.AddStat(otherStats.itemRarity, multiplier);
+            self.startingResource.AddStat(otherStats.startingResource, multiplier);
+
+
+
+            self.maxHealthMultiplier.AddStat(otherStats.maxHealthMultiplier, multiplier);
+            self.runSpeed.AddStat(otherStats.runSpeed, multiplier);
+            self.airSpeed.AddStat(otherStats.airSpeed, multiplier);
+            self.turnSpeed.AddStat(otherStats.turnSpeed, multiplier);
+            self.drag.AddStat(otherStats.drag, multiplier);
+            self.gravity.AddStat(otherStats.gravity, multiplier);
+            self.fastFallSpeed.AddStat(otherStats.fastFallSpeed, multiplier);
+            self.fastFallLerp.AddStat(otherStats.fastFallLerp, multiplier);
+            self.dashes.AddStat(otherStats.dashes, multiplier);
+            self.boost.AddStat(otherStats.boost, multiplier);
+            self.luck.AddStat(otherStats.luck, multiplier);
+            self.startWithEnergyPercentage.AddStat(otherStats.startWithEnergyPercentage, multiplier);
+            self.itemPriceMultiplier.AddStat(otherStats.itemPriceMultiplier, multiplier);
+            self.sparkMultiplier.AddStat(otherStats.sparkMultiplier, multiplier);
+            self.energyGain.AddStat(otherStats.energyGain, multiplier);
+            self.damageMultiplier.AddStat(otherStats.damageMultiplier, multiplier);
+            self.sparkPickupRange.AddStat(otherStats.sparkPickupRange, multiplier);
+            self.extraLevelDifficulty.AddStat(otherStats.extraLevelDifficulty, multiplier);
+            self.speedDifficultyMultiplier.AddStat(otherStats.speedDifficultyMultiplier, multiplier);
+        }
+        else
+        {
+            orig(self, otherStats, multiplier);
+        }
+    }
+
 
     private static void StaticInteractableCharacterStartHook(On.InteractableCharacter.orig_Start orig, InteractableCharacter self)
     {

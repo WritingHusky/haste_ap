@@ -20,7 +20,7 @@ public class Connection(string hostname, int port)
 
     public DeathLinkService? deathLinkService;
 
-    public bool Connect(string user = "Player1", string? pass = null)
+    public bool Connect(string user = "Player1", string? pass = null, Version modVersion = null)
     {
         username = user;
         LoginResult result;
@@ -51,8 +51,9 @@ public class Connection(string hostname, int port)
             }
             UnityMainThreadDispatcher.Instance().log("AP Connection failed");
             UnityMainThreadDispatcher.Instance().logError(errorMessage);
-            return false; // Did not connect, show the user the contents of `errorMessage`
-                          // TODO Add display message to signal a failure
+            ApDebugLog.Instance.DisplayMessage("AP Connection failed", isDebug:false);
+            ApDebugLog.Instance.DisplayMessage(errorMessage, isDebug: false);
+            return false;
         }
 
         // Successfully connected, `ArchipelagoSession` (assume statically defined as `session` from now on) can now be used to interact with the server and the returned `LoginSuccessful` contains some useful information about the initial connection (e.g. a copy of the slot data as `loginSuccess.SlotData`)
@@ -74,10 +75,19 @@ public class Connection(string hostname, int port)
         }
         deathLinkService = session.CreateDeathLinkService();
 
-        // workshop only gives access to the latest mod version, so i'll need to have backwards compat eventually
+        // workshop only gives access to the latest mod version, so there will need to be backwards compat in some places
         if (loginSuccess.SlotData.TryGetValue("Version", out object VersionNum))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found Version in slot data with value: {VersionNum}");
+
+            var apVersion = new Version((string)VersionNum);
+
+            if (modVersion.CompareTo(apVersion) > 0)
+            {
+                // mod is newer than AP
+                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>WARNING:</color> Mod version {modVersion} is newer than APworld version {apVersion}.\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the best experience.", isDebug:false);
+            }
+
             string[] subs = VersionNum.ToString().Split('.');
             FactSystem.SetFact(new Fact("APVersionMajor"), Convert.ToSingle(int.Parse(subs[0])));
             FactSystem.SetFact(new Fact("APVersionMiddle"), Convert.ToSingle(int.Parse(subs[1])));
@@ -261,6 +271,8 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitBody in slot data with value: {DefSkinBody}");
             FactSystem.SetFact(new Fact("equipped_skin_body"), Convert.ToSingle(DefSkinBody));
+            SkinManager.UnlockSkin((SkinManager.Skin)Convert.ToInt32(DefSkinBody));
+            SkinManager.PurchaseSkin((SkinManager.Skin)Convert.ToInt32(DefSkinBody));
         }
         else
         {
@@ -271,11 +283,26 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitHat in slot data with value: {DefSkinHat}");
             FactSystem.SetFact(new Fact("equipped_skin_head"), Convert.ToSingle(DefSkinHat));
+            SkinManager.UnlockSkin((SkinManager.Skin)Convert.ToInt32(DefSkinHat));
+            SkinManager.PurchaseSkin((SkinManager.Skin)Convert.ToInt32(DefSkinHat));
         }
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get DefaultOutfitHat from slot data:" + loginSuccess.SlotData.toJson());
         }
+
+        if (loginSuccess.SlotData.TryGetValue("Captain's Upgrades", out object CaptainsUpgrades))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found CaptainsUpgrades in slot data with value: {CaptainsUpgrades}");
+            FactSystem.SetFact(new Fact("APCaptainsRewards"), Convert.ToSingle(CaptainsUpgrades));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get CaptainsUpgrades from slot data:" + loginSuccess.SlotData.toJson());
+        }
+
+        //TODO: Add weeboh purchases
+
 
         // get the AP Debug Log settings.
         // normally this value gets set when you toggle the settings from the menu, however the initial value from previous sessions needs to be loaded manually at the start for it to take effect

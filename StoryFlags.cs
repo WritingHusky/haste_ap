@@ -33,6 +33,7 @@ namespace StoryFlags
             "played_15_Main_Shard01_Completed",
             "played_17_Main_MeetHeir",
             "played_18_Main_MeetHeirHub",
+            "played_19_Main_HeirAgencyLeader",
             "played_20_Main_MeetAgencyLeader",
             "played_23_Main_Shard02_Completed_Sage",
             "played_25_Main_Wraith01",

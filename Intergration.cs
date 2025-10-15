@@ -127,6 +127,37 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Progressive Speed Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Progressive Speed Upgrade");
                         FactSystem.AddToFact(new Fact("APSpeedUpgradesCollected"), 1f);
+                        //TODO: reset stats here and 5 other places below lol
+                        break;
+                    case "Max Health Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Max Health Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Max Health Upgrade");
+                        FactSystem.AddToFact(new Fact("APUpgradeMaxHealth"), 1f);
+                        break;
+                    case "Max Lives Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Extra Lives Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Extra Lives Upgrade");
+                        FactSystem.AddToFact(new Fact("APUpgradeMaxLives"), 1f);
+                        break;
+                    case "Max Energy Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Max Energy Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Max Energy Upgrade");
+                        FactSystem.AddToFact(new Fact("APUpgradeMaxEnergy"), 1f);
+                        break;
+                    case "Sparks in Shard Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Sparks in Shard Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Sparks in Shard Upgrade");
+                        FactSystem.AddToFact(new Fact("APUpgradeLevelSparks"), 1f);
+                        break;
+                    case "Item Rarity Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Item Rarity Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Item Rarity Upgrade");
+                        FactSystem.AddToFact(new Fact("APUpgradeItemRarity"), 1f);
+                        break;
+                    case "Starting Sparks Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Starting Sparks Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Starting Sparks Upgrade");
+                        FactSystem.AddToFact(new Fact("APUpgradeStartingSparks"), 1f);
                         break;
                     case "Anti-Spark 10 bundle":
                         UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 10 bundle");
@@ -160,7 +191,7 @@ namespace Integration
                         break;
                     default:
                         UnityMainThreadDispatcher.Instance().logError("Item :" + itemName + " has no handling");
-                        ApDebugLog.Instance.DisplayMessage($"Item {itemName} has no handling");
+                        ApDebugLog.Instance.DisplayMessage($"Item {itemName} has no handling", isDebug:false);
                         break;
                 }
             }
@@ -182,9 +213,8 @@ namespace Integration
 
         public static void GiveDeath(DeathLink death)
         {
-            // TODO Figure out why debug not printing here
             UnityMainThreadDispatcher.Instance().log("AP DeathLink recieved");
-            ApDebugLog.Instance.DisplayMessage("Death Recieved");
+            ApDebugLog.Instance.DisplayMessage("Death Recieved", isDebug:false);
             var cause = "Unkown";
             if (death.Cause != null)
             {
@@ -253,6 +283,27 @@ namespace Integration
                 default:
                     return "NOT FOUND";
 
+            }
+        }
+
+        public static string GetCaptainUpgradeName(string internalname, int currentlevel)
+        {
+            switch (internalname)
+            {
+                case "MaxHealth":
+                    return $"Captain's Max Health Upgrade Purchase {currentlevel + 1}";
+                case "Lives":
+                    return $"Captain's Max Lives Upgrade Purchase";
+                case "MaxEnergy":
+                    return $"Captain's Max Energy Upgrade Purchase {currentlevel + 1}";
+                case "ItemRarity":
+                    return $"Captain's Item Rarity Upgrade Purchase {currentlevel + 1}";
+                case "LevelSparks":
+                    return $"Captain's Sparks in Shard Upgrade Purchase {currentlevel + 1}";
+                case "StartingResource":
+                    return $"Captain's Starting Sparks Upgrade Purchase {currentlevel + 1}";
+                default:
+                    return "NOT FOUND";
             }
         }
     }
