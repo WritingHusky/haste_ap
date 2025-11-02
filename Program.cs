@@ -116,6 +116,7 @@ public partial class Program
         {
             ClearStoryFlags();
         }
+        FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
 
         SaveSystem.Save();
         
@@ -169,7 +170,6 @@ public partial class Program
 
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
-        FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
 
         // Once the player starts in game do the loading as somethings are not setup yet
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
@@ -241,6 +241,14 @@ public partial class Program
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
         UnityMainThreadDispatcher.Instance().log("AP Player death Hooked");
+        ApDebugLog.Instance.DisplayMessage($"Source: {FactSystem.GetFact(new Fact("APDoubleKillStopper"))}");
+        if (FactSystem.GetFact(new Fact("APDoubleKillStopper")) == 1f)
+        {
+            // this kill came from deathlink, so just kill the player but avoid the re-sending of another deathlink
+            FactSystem.SetFact(new Fact("APDoubleKillStopper"), 0f);
+            orig(self);
+            return;
+        }
         ApDebugLog.Instance.DisplayMessage("Death Link sent");
         connection!.deathLinkService!.SendDeathLink(new DeathLink(connection.username));
         orig(self);

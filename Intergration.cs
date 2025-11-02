@@ -1,8 +1,9 @@
-using Landfall.Haste;
-using UnityEngine.SceneManagement;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
+using Landfall.Haste;
 using System.Reflection;
+using UnityEngine.SceneManagement;
 using Zorro.Core;
+using Zorro.Settings;
 
 namespace Integration
 {
@@ -232,6 +233,7 @@ namespace Integration
             if (FallOutMethod != null)
             {
                 // Invoke the method
+                FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
                 FallOutMethod.Invoke(GM_Run.instance, [PlayerCharacter.localPlayer]);
             }
             else

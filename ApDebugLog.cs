@@ -23,7 +23,7 @@ public class ApDebugLog : MonoBehaviour
 
     // initial values for 1080p screen, will be recalculated almost immediately
     public float yBaseOffset = -150f;
-    public float xBaseOffset = 10f;
+    public float xBaseOffset = 20f;
     public bool messagesGoDown = true;
     public Vector2 ancMin = Vector2.zero;
     public Vector2 ancMax = Vector2.zero;
@@ -34,7 +34,7 @@ public class ApDebugLog : MonoBehaviour
 
     // easier to just store the custom setting seperately and only call them when set to custom
     public float yCustomOffset = -150f;
-    public float xCustomOffset = 10f;
+    public float xCustomOffset = 20f;
     public bool customMessagesGoDown = true;
     public TextAlignmentOptions customAlignmentMode = TextAlignmentOptions.Left;
 
@@ -103,7 +103,7 @@ public class ApDebugLog : MonoBehaviour
         {
             case APLogLocation.TopRight:
                 yBaseOffset = -150f;
-                xBaseOffset = 10f;
+                xBaseOffset = 20f;
                 ancMin = new Vector2(0, 1);
                 ancMax = new Vector2(0, 1);
                 pivot = new Vector2(0, 1);
@@ -112,7 +112,7 @@ public class ApDebugLog : MonoBehaviour
                 break;
             case APLogLocation.MidRight:
                 yBaseOffset = -Screen.height / 3;
-                xBaseOffset = 10f;
+                xBaseOffset = 20f;
                 ancMin = new Vector2(0, 1);
                 ancMax = new Vector2(0, 1);
                 pivot = new Vector2(0, 1);
@@ -121,7 +121,7 @@ public class ApDebugLog : MonoBehaviour
                 break;
             case APLogLocation.BottomRight:
                 yBaseOffset = -Screen.height + 50f;
-                xBaseOffset = 10f;
+                xBaseOffset = 20f;
                 ancMin = new Vector2(0, 1);
                 ancMax = new Vector2(0, 1);
                 pivot = new Vector2(0, 1);
@@ -130,7 +130,7 @@ public class ApDebugLog : MonoBehaviour
                 break;
             case APLogLocation.TopLeft:
                 yBaseOffset = -150f;
-                xBaseOffset = -10f;
+                xBaseOffset = -20f;
                 ancMin = new Vector2(1, 1);
                 ancMax = new Vector2(1, 1);
                 pivot = new Vector2(1, 1);
@@ -139,7 +139,7 @@ public class ApDebugLog : MonoBehaviour
                 break;
             case APLogLocation.MidLeft:
                 yBaseOffset = -Screen.height / 3;
-                xBaseOffset = -10f;
+                xBaseOffset = -20f;
                 ancMin = new Vector2(1, 1);
                 ancMax = new Vector2(1, 1);
                 pivot = new Vector2(1, 1);
@@ -148,7 +148,7 @@ public class ApDebugLog : MonoBehaviour
                 break;
             case APLogLocation.BottomLeft:
                 yBaseOffset = -Screen.height + 50f;
-                xBaseOffset = -10f;
+                xBaseOffset = -20f;
                 ancMin = new Vector2(1, 1);
                 ancMax = new Vector2(1, 1);
                 pivot = new Vector2(1, 1);
