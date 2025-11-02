@@ -127,37 +127,42 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Progressive Speed Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Progressive Speed Upgrade");
                         FactSystem.AddToFact(new Fact("APSpeedUpgradesCollected"), 1f);
-                        //TODO: reset stats here and 5 other places below lol
                         break;
                     case "Max Health Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Max Health Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Max Health Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxHealth"), 1f);
+                        Player.localPlayer.ResetStats();
                         break;
                     case "Max Lives Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Extra Lives Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Extra Lives Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxLives"), 1f);
+                        Player.localPlayer.ResetStats();
                         break;
                     case "Max Energy Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Max Energy Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Max Energy Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxEnergy"), 1f);
+                        Player.localPlayer.ResetStats();
                         break;
                     case "Sparks in Shard Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Sparks in Shard Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Sparks in Shard Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeLevelSparks"), 1f);
+                        Player.localPlayer.ResetStats();
                         break;
                     case "Item Rarity Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Item Rarity Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Item Rarity Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeItemRarity"), 1f);
+                        Player.localPlayer.ResetStats();
                         break;
                     case "Starting Sparks Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Starting Sparks Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Starting Sparks Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeStartingSparks"), 1f);
+                        Player.localPlayer.ResetStats();
                         break;
                     case "Anti-Spark 10 bundle":
                         UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 10 bundle");
@@ -191,7 +196,7 @@ namespace Integration
                         break;
                     default:
                         UnityMainThreadDispatcher.Instance().logError("Item :" + itemName + " has no handling");
-                        ApDebugLog.Instance.DisplayMessage($"Item {itemName} has no handling", isDebug:false);
+                        ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Item {itemName} has no handling.\nPlease screenshot this error and send it to the developer of this mod so it can be fixed.", isDebug:false, duration:15f);
                         break;
                 }
             }
@@ -222,12 +227,12 @@ namespace Integration
             }
             UnityMainThreadDispatcher.Instance().log("AP Lets try to Kill the player!");
             var gm_runType = GM_Run.instance.GetType();
-            var FallOutMethod = gm_runType.GetMethod("FallOut", BindingFlags.Instance | BindingFlags.NonPublic);
+            var FallOutMethod = gm_runType.GetMethod("FallOut", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(PlayerCharacter)], null);
 
             if (FallOutMethod != null)
             {
                 // Invoke the method
-                FallOutMethod.Invoke(GM_Run.instance, new object[] { });
+                FallOutMethod.Invoke(GM_Run.instance, [PlayerCharacter.localPlayer]);
             }
             else
             {
@@ -305,6 +310,35 @@ namespace Integration
                 default:
                     return "NOT FOUND";
             }
+        }
+
+        public static string GetFashionPurchaseName(SkinManager.Skin skin)
+        {
+            switch (skin)
+            {
+                case SkinManager.Skin.Crispy:
+                    return "Crispy";
+                case SkinManager.Skin.Green:
+                    return "Little Sister";
+                case SkinManager.Skin.Blue:
+                    return "Supersonic Zoe";
+                case SkinManager.Skin.Shadow:
+                    return "Zoe the Shadow";
+                case SkinManager.Skin.Wobbler:
+                    return "Totally Accurate Zoe";
+                case SkinManager.Skin.Clown:
+                    return "Flopsy";
+                case SkinManager.Skin.DarkClown:
+                    return "Twisted Flopsy";
+                case SkinManager.Skin.Weeboh:
+                    return "Weeboh";
+                case SkinManager.Skin.Zoe64:
+                    return "Zoe 64";
+                default:
+                    return "NOT FOUND";
+
+            }
+
         }
     }
 }

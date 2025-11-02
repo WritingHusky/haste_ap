@@ -1,0 +1,16 @@
+{
+  "ArchipelagoShopItem_Title": {
+    "default": "Archipelago Item"
+  },
+  "ArchipelagoShopItem_flavor": {
+    "default": "It might not look like much, but it could be useful in a distant world!"
+  },
+  "ArchipelagoShopItem_desc": {
+    "default": "Sends an <color=#FFFF00>Archipelago item</color> into the multiworld."
+  },
+  "ArchipelagoShopItem_trigger": {
+    "default": "On Purchase"
+  }
+
+  
+}

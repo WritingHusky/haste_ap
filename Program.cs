@@ -14,7 +14,7 @@ public partial class Program
 {
     private static Connection? connection;
 
-    private static readonly Version version = new(0, 2, 2);
+    private static readonly Version version = new(0, 3, 0);
 
     static Program()
     {
@@ -150,6 +150,10 @@ public partial class Program
         On.GM_API.OnBossDeath += StaticBossDeathHook;
 
         On.ShopItemHandler.BuyItem += StaticBuyItemHook;
+        On.ShopItemHandler.GenerateItems += StaticGenerateItemHook;
+
+        On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin += StaticPurchaseSkinHook;
+        On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins += StaticDefaultUnlockedSkinsHook;
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
@@ -165,16 +169,15 @@ public partial class Program
 
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
+        FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
 
         // Once the player starts in game do the loading as somethings are not setup yet
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
 
-        FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
         UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
         ApDebugLog.Instance.DisplayMessage("Loading normally now");
         orig();
     }
-
 
     /// <summary>
     /// Extra function to remove hooks on exiting the game, so that new hooks arent accidentally installed ontop of existing ones
@@ -186,6 +189,9 @@ public partial class Program
         On.GM_API.OnEndBossWin -= StaticEndBossHook;
         On.GM_API.OnBossDeath -= StaticBossDeathHook;
         On.ShopItemHandler.BuyItem -= StaticBuyItemHook;
+        On.ShopItemHandler.GenerateItems -= StaticGenerateItemHook;
+        On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin -= StaticPurchaseSkinHook;
+        On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins -= StaticDefaultUnlockedSkinsHook;
         On.SaveSystem.Load -= StaticSaveLoadHook;
         On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
@@ -278,10 +284,10 @@ public partial class Program
     {
         if (connection != null)
         {
+            ClearHooks();
             connection.Close();
             connection = null;
             ApDebugLog.Instance.DisplayMessage("Removed connection");
-            ClearHooks();
             FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         }
 
@@ -368,6 +374,82 @@ public partial class Program
         }
     }
 
+
+    private static void StaticGenerateItemHook(On.ShopItemHandler.orig_GenerateItems orig, ShopItemHandler self)
+    {
+        if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f)
+        {
+
+            // more type reflection bs to get around private values being annoying 
+            Type metaShopItemHandler = typeof(ShopItemHandler);
+            FieldInfo entryRerolls = metaShopItemHandler.GetField("rerolls", BindingFlags.NonPublic | BindingFlags.Instance);
+            var rerolls = entryRerolls.GetValue(self) as int?;
+            FieldInfo entryItemInstances = metaShopItemHandler.GetField("itemInstances", BindingFlags.NonPublic | BindingFlags.Instance);
+            var ItemInstances = entryItemInstances.GetValue(self) as List<ItemInstance>;
+            FieldInfo entryItemVisuals = metaShopItemHandler.GetField("itemVisuals", BindingFlags.NonPublic | BindingFlags.Instance);
+            var ItemVisuals = entryItemVisuals.GetValue(self) as List<ShopItem>;
+            MethodInfo entryUnset = metaShopItemHandler.GetMethod("Unset", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(int)], null);
+
+            try
+            {
+                if (rerolls == null) ApDebugLog.Instance.DisplayMessage($"rerolls detected null");
+                if (ItemInstances == null) ApDebugLog.Instance.DisplayMessage($"ItemInstances detected null");
+                if (ItemVisuals == null) ApDebugLog.Instance.DisplayMessage($"ItemVisuals detected null");
+                if (entryUnset == null) ApDebugLog.Instance.DisplayMessage($"entryUnset detected null");
+                Player localPlayer = Player.localPlayer;
+                System.Random currentLevelRandomInstance = RunHandler.GetCurrentLevelRandomInstance((int)rerolls);
+                List<ItemInstance> excludedList = new List<ItemInstance>();
+                foreach (ItemInstance itemInstance in ItemInstances)
+                {
+                    if (itemInstance)
+                    {
+                        excludedList.Add(itemInstance);
+                    }
+                }
+                int num = Mathf.Max(ItemInstances.Count, ItemVisuals.Count);
+                for (int i = 0; i < num; i++)
+                {
+                    entryUnset.Invoke(self, [i]);
+                }
+
+                for (int j = 0; j < 3; j++)
+                {
+                    ItemInstance? itemInstance2 = null;
+                    System.Random random = new System.Random();
+                    //TODO: determine if there are no AP items left in that region, then make it spawn a normal item instead
+                    // unless the inX is 100, then just let them keep getting useless items I guess (maybe another dummy item)
+                    int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
+                    if (random.Next(1, 100) <= inX)
+                    {
+                        itemInstance2 = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList()[0];
+                    }
+                    else
+                    {
+                        itemInstance2 = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
+                    }
+                    if (itemInstance2 != null)
+                    {
+                        // normal items
+                        if (itemInstance2.itemName != "ArchipelagoShopItem") excludedList.Add(itemInstance2);
+                        ItemInstances.Add(itemInstance2);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                UnityMainThreadDispatcher.Instance().log($"Error in generating shop items {e.Message},{e.InnerException},{e.StackTrace}");
+                ApDebugLog.Instance.DisplayMessage($"Error in generating shop items {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
+            }
+
+            
+            
+        } else
+        {
+            orig(self);
+        }
+    }
+
+
     /// <summary>
     /// Hook into when a player buys and item. Used to give item locations
     /// </summary>
@@ -380,27 +462,35 @@ public partial class Program
         }
         var item_location = "";
         bool canSend = true;
+        bool shouldParse = true;
 
-        if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
+
+        if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f && item.itemName != "ArchipelagoShopItem")
         {
-            var currentShard = RunHandler.RunData.shardID + 1;
-            item_location = "Shard " + currentShard + " Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
-            FactSystem.AddToFact(new Fact("APShopsanityShard" + currentShard), 1f);
-            canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
-        } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
-        {
-            item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1).ToString("D3");
-            FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
-            canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
-        } else if (FactSystem.GetFact(new Fact("APShopsanity")) == 0f)
-        {
+            shouldParse = false;
             canSend = false;
         }
 
-        // somewhere in here:
-        // if APshopsanity mode is 1 (seperate)
-        // check if the item is the AP item, then only send in that case
-        // else its a normal item that isnt granting a check and proceed as normal
+        if (shouldParse)
+        {
+            if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
+            {
+                var currentShard = RunHandler.RunData.shardID + 1;
+                item_location = "Shard " + currentShard + " Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
+                FactSystem.AddToFact(new Fact("APShopsanityShard" + currentShard), 1f);
+                canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+            }
+            else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
+            {
+                item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1).ToString("D3");
+                FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
+                canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+            }
+            else if (FactSystem.GetFact(new Fact("APShopsanity")) == 0f)
+            {
+                canSend = false;
+            }
+        }
 
         if (canSend)
         {
@@ -537,16 +627,11 @@ public partial class Program
                     sfx.increase.Play();
                 }
             }
-            ApDebugLog.Instance.DisplayMessage(string.Format("AP Upgrading meta progression stat {0}", self.kind), isDebug:false);
-            // TODO: make another lookup function like i do for abilities, also dont forget to add 1 to the current level
-            ApDebugLog.Instance.DisplayMessage($"Pretending to send 'Captains Upgrade: {self.kind} {entry.CurrentLevel}'", isDebug: false);
             connection.SendLocation(GetCaptainUpgradeName(self.kind.ToString(), entry.CurrentLevel));
-            // then, instead of changing the variable, change some alternate Fact
             int? nextLevel = entry.GetNextLevel(entry.CurrentLevel);
             if (nextLevel != null)
             {
                 int valueOrDefault = nextLevel.GetValueOrDefault();
-                // this next line is what needs to be changed
                 entry.CurrentLevel = valueOrDefault;
             }
             else
@@ -554,14 +639,13 @@ public partial class Program
                 ApDebugLog.Instance.DisplayMessage(string.Format("Error: could not get next level for {0} (currernt level = {1}). This shouldn't happen due to checks above.", entry.fact, entry.CurrentLevel));
             }
             FactSystem.AddToFact(MetaProgression.MetaProgressionResource, (float)(-(float)item));
-            // how do i make it refresh the UI from here uhhhhhhh
             SaveSystem.Save();
 
-            //FieldInfo basefield = metaRowType.GetField("base", BindingFlags.NonPublic | BindingFlags.Instance);
-            //var thebase = basefield.GetValue(self) as UnityEngine.Component;
-
-            // so this is the part that updates the antispark count UI so i kinda cant avoid this lol
-            //thebase.GetComponentInParent<MetaProgressionUI>().RefreshUI();
+            // shoutouts to RDS' Captain Refunder mod for the code I copied to get this type reflection hell to work
+            Type MetaUIType = typeof(MetaProgressionRowUI).Assembly.GetType("Landfall.Haste.MetaProgressionUI");
+            MethodInfo refreshUiInfo = MetaUIType.GetMethod("RefreshUI", BindingFlags.Instance | BindingFlags.Public);
+            object metaUiInstance = GameObject.FindAnyObjectByType(MetaUIType);
+            refreshUiInfo.Invoke(metaUiInstance, null);
             self.RefreshUI();
 
         }
@@ -576,40 +660,43 @@ public partial class Program
     {
         if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
         {
-            //ApDebugLog.Instance.DisplayMessage($"default health: {otherStats.maxHealth.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"default lives: {otherStats.lives.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"default energy: {otherStats.maxEnergy.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"default l sparks: {otherStats.extraLevelSparks.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"default rarity: {otherStats.itemRarity.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"default resource: {otherStats.startingResource.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"incoming health: {otherStats.maxHealth.baseValue}, {self.maxHealth.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"incoming lives: {otherStats.lives.baseValue}, {self.lives.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"incoming energy: {otherStats.maxEnergy.baseValue}, {self.maxEnergy.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"incoming l sparks: {otherStats.extraLevelSparks.baseValue}, {self.extraLevelSparks.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"incoming rarity: {otherStats.itemRarity.baseValue}, {self.itemRarity.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"incoming resource: {otherStats.startingResource.baseValue}, {self.startingResource.baseValue}");
             float calcmaxHealth = 80f + (10 * FactSystem.GetFact(new Fact("APUpgradeMaxHealth")));
             float calclives = 3f + FactSystem.GetFact(new Fact("APUpgradeMaxLives"));
-            // THESE next three might need some value tweaking, i think these are wrong and might need to just be 1 mults the whole way down
             float calcmaxEnergy = 0.5f + (0.2f * FactSystem.GetFact(new Fact("APUpgradeMaxEnergy")));
-            float calcextraLevelSparks = (1 * FactSystem.GetFact(new Fact("APUpgradeLevelSparks")));
-            float calcitemRarity = (1 * FactSystem.GetFact(new Fact("APUpgradeItemRarity")));
-            float calcstartingResource = 0f;
-            switch (FactSystem.GetFact(new Fact("APUpgradeStartingSparks")))
+            // THESE next two might need some value tweaking, i think these are wrong and might need to just be 1 mults the whole way down
+            float calcextraLevelSparks = (40f * FactSystem.GetFact(new Fact("APUpgradeLevelSparks")));
+            float calcitemRarity = (0.25f * FactSystem.GetFact(new Fact("APUpgradeItemRarity")));
+            float calcstartingResource = (float)FactSystem.GetFact(new Fact("APUpgradeStartingSparks")) switch
             {
-                case 1f:
-                    calcstartingResource = 100f;
-                    break;
-                case 2f:
-                    calcstartingResource = 250;
-                    break;
-                case 3f:
-                    calcstartingResource = 500;
-                    break;
-                default:
-                    calcstartingResource = 250f * FactSystem.GetFact(new Fact("APUpgradeStartingSparks"));
-                    break;
-            }
+                1f => 100f,
+                2f => 250f,
+                3f => 500f,
+                _ => 150f * FactSystem.GetFact(new Fact("APUpgradeStartingSparks")),
+            };
+            //ApDebugLog.Instance.DisplayMessage($"calc health: {calcmaxHealth}");
+            //ApDebugLog.Instance.DisplayMessage($"calc lives: {calclives}");
+            //ApDebugLog.Instance.DisplayMessage($"calc energy: {calcmaxEnergy}");
+            //ApDebugLog.Instance.DisplayMessage($"calc l sparks: {calcextraLevelSparks}");
+            //ApDebugLog.Instance.DisplayMessage($"calc rarity: {calcitemRarity}");
+            //ApDebugLog.Instance.DisplayMessage($"calc resource: {calcstartingResource}");
             otherStats.maxHealth.baseValue = (self.maxHealth.baseValue < calcmaxHealth) ? calcmaxHealth : otherStats.maxHealth.baseValue;
             otherStats.lives.baseValue = (self.lives.baseValue < calclives) ? calclives : otherStats.lives.baseValue;
             otherStats.maxEnergy.baseValue = (self.maxEnergy.baseValue < calcmaxEnergy) ? calcmaxEnergy : otherStats.maxEnergy.baseValue;
-            otherStats.extraLevelSparks.baseValue = (self.extraLevelSparks.baseValue < calcextraLevelSparks) ? calcextraLevelSparks : otherStats.extraLevelSparks.baseValue;
+            otherStats.extraLevelSparks.baseValue = (self.extraLevelSparks.baseValue < 200f + calcextraLevelSparks) ? calcextraLevelSparks : otherStats.extraLevelSparks.baseValue;
             otherStats.itemRarity.baseValue = (self.itemRarity.baseValue < calcitemRarity) ? calcitemRarity : otherStats.itemRarity.baseValue;
-            otherStats.startingResource.baseValue = (self.startingResource.baseValue < calcstartingResource) ? calcstartingResource : otherStats.startingResource.baseValue;
+            otherStats.startingResource.baseValue = (self.startingResource.baseValue <= calcstartingResource) ? calcstartingResource : otherStats.startingResource.baseValue;
+            //ApDebugLog.Instance.DisplayMessage($"outgoing health: {otherStats.maxHealth.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"outgoing lives: {otherStats.lives.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"outgoing energy: {otherStats.maxEnergy.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"outgoing l sparks: {otherStats.extraLevelSparks.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"outgoing rarity: {otherStats.itemRarity.baseValue}");
+            //ApDebugLog.Instance.DisplayMessage($"outgoing resource: {otherStats.startingResource.baseValue}");
             self.maxHealth.AddStat(otherStats.maxHealth, multiplier);
             self.lives.AddStat(otherStats.lives, multiplier);
             self.maxEnergy.AddStat(otherStats.maxEnergy, multiplier);
@@ -645,6 +732,29 @@ public partial class Program
         }
     }
 
+    private static void StaticPurchaseSkinHook(On.Landfall.Haste.SkinPurchasePopup.orig_PurchaseSkin orig, SkinPurchasePopup self)
+    {
+        if (connection == null)
+        {
+            ApDebugLog.Instance.DisplayMessage("AP On Skin Purchase the connection is null");
+            return;
+        }
+        if (FactSystem.GetFact(new Fact("APFashionPurchases")) >= 1f)
+        {
+            connection.SendLocation($"{GetFashionPurchaseName(self.skin.Skin)} Costume Purchase");
+        }
+        orig(self);
+
+    }
+
+    private static void StaticDefaultUnlockedSkinsHook(On.Landfall.Haste.SkinManager.orig_SetDefaultUnlockedSkins orig)
+    {
+        if (FactSystem.GetFact(new Fact("APFashionPurchases")) < 2f)
+        {
+            // only set the defaults in vanilla and off
+            orig();
+        }
+    }
 
     private static void StaticInteractableCharacterStartHook(On.InteractableCharacter.orig_Start orig, InteractableCharacter self)
     {
@@ -725,8 +835,8 @@ public class ApDebugEnabledSetting : BoolSetting, IExposedSetting
 
     public override void ApplyValue() => FactSystem.SetFact(new Fact("APDebugLogEnabled"), Value ? 1f : 0f);
     protected override bool GetDefaultValue() => false;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Debug Toggle");
-    public string GetCategory() => "AP";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Debug Toggle");
+    public string GetCategory() => "AP Log";
 }
 
 [HasteSetting]
@@ -734,29 +844,11 @@ public class ApLogFilter : EnumSetting<APFilterMode>, IExposedSetting
 {
     public override void ApplyValue() => FactSystem.SetFact(new Fact("APMessageFilter"), (float)Value);
     protected override APFilterMode GetDefaultValue() => APFilterMode.None;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Filter");
-    public string GetCategory() => "AP";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Text Client Filter");
+    public string GetCategory() => "AP Log";
 
     public override List<LocalizedString> GetLocalizedChoices() => [new UnlocalizedString("All Messages"), new UnlocalizedString("Only Messages About Player"), new UnlocalizedString("Messages About Player + Chat")];
 
-}
-
-[HasteSetting]
-public class ApLogXOffset : IntSetting, IExposedSetting
-{
-    public override void ApplyValue() => ApDebugLog.Instance.xBaseOffset = Value;
-    protected override int GetDefaultValue() => -650;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client X Offset");
-    public string GetCategory() => "AP";
-}
-
-[HasteSetting]
-public class ApLogYOffset : IntSetting, IExposedSetting
-{
-    public override void ApplyValue() => ApDebugLog.Instance.yBaseOffset = Value;
-    protected override int GetDefaultValue() => 150;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Y Offset");
-    public string GetCategory() => "AP";
 }
 
 [HasteSetting]
@@ -767,17 +859,76 @@ public class ApLogFontSize : IntSetting, IExposedSetting
         ApDebugLog.Instance.fontSize = Value;
     }
     protected override int GetDefaultValue() => 16;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Font Size");
-    public string GetCategory() => "AP";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Text Client Font Size");
+    public string GetCategory() => "AP Log";
 }
+
 
 [HasteSetting]
 public class ApLogLineSpacing : IntSetting, IExposedSetting
 {
     public override void ApplyValue() => ApDebugLog.Instance.lineSpacing = Value;
     protected override int GetDefaultValue() => 20;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Line Spacing");
-    public string GetCategory() => "AP";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Text Client Line Spacing");
+    public string GetCategory() => "AP Log";
+}
+
+[HasteSetting]
+public class ApLogLocation : EnumSetting<APLogLocation>, IExposedSetting
+{
+    public override void ApplyValue() {
+        ApDebugLog.Instance.windowPosition = Value;
+        ApDebugLog.Instance.RecalculatePosition();
+    }
+    protected override APLogLocation GetDefaultValue() => APLogLocation.TopRight;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Text Client Location");
+    public string GetCategory() => "AP Log";
+
+    public override List<LocalizedString> GetLocalizedChoices() => [
+        new UnlocalizedString("Top Right"), 
+        new UnlocalizedString("Middle Right"), 
+        new UnlocalizedString("Bottom Right"), 
+        new UnlocalizedString("Top Left"),
+        new UnlocalizedString("Middle Left"),
+        new UnlocalizedString("Bottom Left"),
+        new UnlocalizedString("Custom"),
+        ];
+
+}
+
+[HasteSetting]
+public class ApLogXOffset : IntSetting, IExposedSetting
+{
+    public override void ApplyValue() {
+        ApDebugLog.Instance.xCustomOffset = Value;
+        ApDebugLog.Instance.RecalculatePosition();
+    }
+    protected override int GetDefaultValue() => -650;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Custom X Offset");
+    public string GetCategory() => "AP Log";
+}
+
+[HasteSetting]
+public class ApLogYOffset : IntSetting, IExposedSetting
+{
+    public override void ApplyValue() { 
+        ApDebugLog.Instance.yCustomOffset = Value;
+        ApDebugLog.Instance.RecalculatePosition();
+    }
+    protected override int GetDefaultValue() => 150;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Custom Y Offset");
+    public string GetCategory() => "AP Log";
+}
+
+[HasteSetting]
+public class ApLogAlignment : BoolSetting, IExposedSetting
+{
+    public override LocalizedString OffString => new UnlocalizedString("Left");
+    public override LocalizedString OnString => new UnlocalizedString("Right");
+    public override void ApplyValue() => ApDebugLog.Instance.customAlignmentMode = (Value) ? TMPro.TextAlignmentOptions.Left : TMPro.TextAlignmentOptions.Right;
+    protected override bool GetDefaultValue() => false;
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Custom Text Alignment");
+    public string GetCategory() => "AP Log";
 }
 
 [HasteSetting]
@@ -785,21 +936,22 @@ public class ApLogDirection : BoolSetting, IExposedSetting
 {
     public override LocalizedString OffString => new UnlocalizedString("Messages go up");
     public override LocalizedString OnString => new UnlocalizedString("Messages go down");
-    public override void ApplyValue() => ApDebugLog.Instance.messagesGoDown = Value;
+    public override void ApplyValue() => ApDebugLog.Instance.customMessagesGoDown = Value;
     protected override bool GetDefaultValue() => true;
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Message Direction");
-    public string GetCategory() => "AP";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Custom Message Direction");
+    public string GetCategory() => "AP Log";
 }
 
 [HasteSetting]
 public class ApLogTestMessage : ButtonSetting, IExposedSetting
 {
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Text Client Example Message");
-    public string GetCategory() => "AP";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Text Client Example Message");
+    public string GetCategory() => "AP Log";
 
     public override void OnClicked(ISettingHandler settingHandler)
     {
         ApDebugLog.Instance.DisplayMessage("This is a test message that is really long so that way you can make sure the text appears on screen correctly.", isDebug: false);
+        ApDebugLog.Instance.RecalculatePosition();
     }
 
     public override string GetButtonText()

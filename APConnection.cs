@@ -85,7 +85,7 @@ public class Connection(string hostname, int port)
             if (modVersion.CompareTo(apVersion) > 0)
             {
                 // mod is newer than AP
-                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>WARNING:</color> Mod version {modVersion} is newer than APworld version {apVersion}.\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the best experience.", isDebug:false);
+                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>WARNING:</color> Mod version {modVersion} is newer than APworld version {apVersion}.\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the smoothest experience.", isDebug:false);
             }
 
             string[] subs = VersionNum.ToString().Split('.');
@@ -157,6 +157,27 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get Shopsanity from slot data:" + loginSuccess.SlotData.toJson());
             // Might default the value here to make things consistant
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity Seperate", out object ShopsanitySeperate))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found ShopsanitySeperate in slot data with value: {ShopsanitySeperate}");
+            FactSystem.SetFact(new Fact("APShopsanitySeperate"), Convert.ToSingle(ShopsanitySeperate));
+            if (loginSuccess.SlotData.TryGetValue("Shopsanity Seperate Rate", out object ShopsanitySeperateRate))
+            {
+                UnityMainThreadDispatcher.Instance().log($"AP found ShopsanitySeperate in slot data with value: {ShopsanitySeperateRate}");
+                FactSystem.SetFact(new Fact("APShopsanitySeperateRate"), Convert.ToSingle(ShopsanitySeperateRate));
+            }
+            else
+            {
+                UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanitySeperateRate from slot data:" + loginSuccess.SlotData.toJson());
+                FactSystem.SetFact(new Fact("APShopsanitySeperateRate"), 2f);
+            }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanitySeperate from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APShopsanitySeperate"), 0f);
         }
 
 
@@ -267,12 +288,47 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APSpeedUpgrades"), 0f);
         }
 
+        if (loginSuccess.SlotData.TryGetValue("Fashion Weeboh's Purchases", out object FashionPurchases))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found FashionPurchases in slot data with value: {FashionPurchases}");
+            FactSystem.SetFact(new Fact("APFashionPurchases"), Convert.ToSingle(FashionPurchases));
+            // only do this upon init
+            if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+            {
+                if (Convert.ToSingle(FashionPurchases) == 2f)
+                {
+                    // Unlocks Cripsy and Twisted and locks Green and Blue
+                    SkinManager.UnlockSkin(SkinManager.Skin.Crispy);
+                    SkinManager.UnlockSkin(SkinManager.Skin.DarkClown);
+                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Green);
+                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Blue);
+                    // manually unlocks Zoe64 and Shadow since the default unlocker is bypassed
+                    SkinManager.UnlockSkin(SkinManager.Skin.Zoe64);
+                    SkinManager.UnlockSkin(SkinManager.Skin.Shadow);
+                }
+                else if (Convert.ToSingle(FashionPurchases) == 3f)
+                {
+                    // Unlocks all
+                    SkinManager.UnlockAllSkins();
+                    // weird guys
+                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Green);
+                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Blue);
+                }
+            }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get FashionPurchases from slot data:" + loginSuccess.SlotData.toJson());
+        }
+
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitBody in slot data with value: {DefSkinBody}");
             FactSystem.SetFact(new Fact("equipped_skin_body"), Convert.ToSingle(DefSkinBody));
-            SkinManager.UnlockSkin((SkinManager.Skin)Convert.ToInt32(DefSkinBody));
-            SkinManager.PurchaseSkin((SkinManager.Skin)Convert.ToInt32(DefSkinBody));
+            if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+            {
+                //SkinManager.PurchaseSkin((SkinManager.Skin)Convert.ToInt32(DefSkinBody));
+            }
         }
         else
         {
@@ -283,8 +339,10 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().log($"AP found DefaultOutfitHat in slot data with value: {DefSkinHat}");
             FactSystem.SetFact(new Fact("equipped_skin_head"), Convert.ToSingle(DefSkinHat));
-            SkinManager.UnlockSkin((SkinManager.Skin)Convert.ToInt32(DefSkinHat));
-            SkinManager.PurchaseSkin((SkinManager.Skin)Convert.ToInt32(DefSkinHat));
+            if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+            {
+                //SkinManager.PurchaseSkin((SkinManager.Skin)Convert.ToInt32(DefSkinHat));
+            }
         }
         else
         {
@@ -301,7 +359,7 @@ public class Connection(string hostname, int port)
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get CaptainsUpgrades from slot data:" + loginSuccess.SlotData.toJson());
         }
 
-        //TODO: Add weeboh purchases
+        
 
 
         // get the AP Debug Log settings.
@@ -328,6 +386,7 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> No locationID for check: {locationName}", isDebug:false, duration: 15f);
         }
     }
 
@@ -343,6 +402,7 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> No locationID for hint location: {locationName}", isDebug: false, duration: 15f);
         }
     }
 
@@ -366,11 +426,11 @@ public class Connection(string hostname, int port)
             {
 
                 UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
-                ApDebugLog.Instance.DisplayMessage("Item Recieved");
+                //ApDebugLog.Instance.DisplayMessage("Item Recieved");
             }
             catch (Exception e)
             {
-                UnityMainThreadDispatcher.Instance().log($"Error in printing message {e.Message},{e.StackTrace}");
+                UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
                 ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
             }
 

@@ -7,6 +7,7 @@ using System.Media;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Runtime.CompilerServices;
 
 // Inspired / based of the In Game Stats Mod by Qwarks
 
@@ -20,16 +21,26 @@ public class ApDebugLog : MonoBehaviour
 
     // public DisplayMode displayMode = DisplayMode.Always;
 
-    // This block of variables will be overwritten using values from the settings menu, these values are just fallbacks in case this fails for some reason.
-    // If you're wanting to change default values, change them in the HasteSetting instead.
-    public float yBaseOffset = 150f;
-    public float xBaseOffset = -650f;
+    // initial values for 1080p screen, will be recalculated almost immediately
+    public float yBaseOffset = -150f;
+    public float xBaseOffset = 10f;
+    public bool messagesGoDown = true;
+    public Vector2 ancMin = Vector2.zero;
+    public Vector2 ancMax = Vector2.zero;
+    public Vector2 pivot = Vector2.zero;
+    
     public int fontSize = 16;
     public int lineSpacing = 20;
-    public bool messagesGoDown = true;
-    // --------------------------------
 
-    public AlignmentMode alignmentMode = AlignmentMode.Left;
+    // easier to just store the custom setting seperately and only call them when set to custom
+    public float yCustomOffset = -150f;
+    public float xCustomOffset = 10f;
+    public bool customMessagesGoDown = true;
+    public TextAlignmentOptions customAlignmentMode = TextAlignmentOptions.Left;
+
+    public APLogLocation windowPosition = APLogLocation.TopRight;
+
+    public TextAlignmentOptions alignmentMode = TextAlignmentOptions.Left;
     public ColorizedMode colorizedMode = ColorizedMode.Colorized;
     public FontMode fontMode = FontMode.GameFont;
     public OutlineMode outlineMode = OutlineMode.Outline;
@@ -65,6 +76,8 @@ public class ApDebugLog : MonoBehaviour
         _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         _canvas.sortingOrder = 1500;
 
+        RecalculatePosition();
+
         CanvasScaler canvasScaler = GetComponent<CanvasScaler>();
         canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         canvasScaler.referenceResolution = new Vector2(Screen.width, Screen.height);
@@ -84,6 +97,85 @@ public class ApDebugLog : MonoBehaviour
         }
     }
 
+    public void RecalculatePosition()
+    {
+        switch (windowPosition)
+        {
+            case APLogLocation.TopRight:
+                yBaseOffset = -150f;
+                xBaseOffset = 10f;
+                ancMin = new Vector2(0, 1);
+                ancMax = new Vector2(0, 1);
+                pivot = new Vector2(0, 1);
+                alignmentMode = TextAlignmentOptions.Left;
+                messagesGoDown = true;
+                break;
+            case APLogLocation.MidRight:
+                yBaseOffset = -Screen.height / 3;
+                xBaseOffset = 10f;
+                ancMin = new Vector2(0, 1);
+                ancMax = new Vector2(0, 1);
+                pivot = new Vector2(0, 1);
+                alignmentMode = TextAlignmentOptions.Left;
+                messagesGoDown = true;
+                break;
+            case APLogLocation.BottomRight:
+                yBaseOffset = -Screen.height + 50f;
+                xBaseOffset = 10f;
+                ancMin = new Vector2(0, 1);
+                ancMax = new Vector2(0, 1);
+                pivot = new Vector2(0, 1);
+                alignmentMode = TextAlignmentOptions.Left;
+                messagesGoDown = false;
+                break;
+            case APLogLocation.TopLeft:
+                yBaseOffset = -150f;
+                xBaseOffset = -10f;
+                ancMin = new Vector2(1, 1);
+                ancMax = new Vector2(1, 1);
+                pivot = new Vector2(1, 1);
+                alignmentMode = TextAlignmentOptions.Right;
+                messagesGoDown = true;
+                break;
+            case APLogLocation.MidLeft:
+                yBaseOffset = -Screen.height / 3;
+                xBaseOffset = -10f;
+                ancMin = new Vector2(1, 1);
+                ancMax = new Vector2(1, 1);
+                pivot = new Vector2(1, 1);
+                alignmentMode = TextAlignmentOptions.Right;
+                messagesGoDown = true;
+                break;
+            case APLogLocation.BottomLeft:
+                yBaseOffset = -Screen.height + 50f;
+                xBaseOffset = -10f;
+                ancMin = new Vector2(1, 1);
+                ancMax = new Vector2(1, 1);
+                pivot = new Vector2(1, 1);
+                alignmentMode = TextAlignmentOptions.Right;
+                messagesGoDown = false;
+                break;
+            case APLogLocation.Custom:
+                yBaseOffset = yCustomOffset;
+                xBaseOffset = xCustomOffset;
+                alignmentMode = customAlignmentMode;
+                if (alignmentMode == TextAlignmentOptions.Left)
+                {
+                    ancMin = new Vector2(0, 1);
+                    ancMax = new Vector2(0, 1);
+                    pivot = new Vector2(0, 1);
+                } else
+                {
+                    ancMin = new Vector2(1, 1);
+                    ancMax = new Vector2(1, 1);
+                    pivot = new Vector2(1, 1);
+                }
+                messagesGoDown = customMessagesGoDown;
+                break;
+        }
+        DisplayMessage($"Log Position X: {xBaseOffset}");
+        DisplayMessage($"Log Position Y: {yBaseOffset}");
+    }
 
     public void DisplayMessage(LogMessage message, float duration = -1f, bool isDebug = false)
     {
@@ -174,7 +266,7 @@ public class ApDebugLog : MonoBehaviour
                 TextMeshProUGUI textComponent = messageObject.AddComponent<TextMeshProUGUI>();
                 textComponent.text = message;
                 textComponent.fontSize = fontSize;
-                textComponent.alignment = TextAlignmentOptions.Left;
+                textComponent.alignment = alignmentMode;
 
                 if (fontMode == FontMode.GameFont && _fontAsset != null)
                 {
@@ -186,7 +278,10 @@ public class ApDebugLog : MonoBehaviour
                 textComponent.outlineWidth = 0.5f;
 
                 RectTransform rectTransform = messageObject.GetComponent<RectTransform>();
-                rectTransform.sizeDelta = new Vector2(600, 50); // Initial size, will adjust later
+                rectTransform.anchorMin = ancMin;
+                rectTransform.anchorMax = ancMax;
+                rectTransform.pivot = pivot;
+                rectTransform.sizeDelta = new Vector2(Screen.width / 3f, fontSize + 5f);
                 rectTransform.anchoredPosition = new Vector2(xBaseOffset, yBaseOffset);
 
                 // Force layout update to calculate preferred height

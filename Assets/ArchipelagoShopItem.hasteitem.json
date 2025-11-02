@@ -1,0 +1,199 @@
+{
+  "minorItem": false,
+  "SpecialItem": true,
+  "rarity": 0,
+  "CostMultiplier": 0.7,
+  "itemTags": [
+    1,
+    3,
+    200,
+    100
+  ],
+  "itemName": "ArchipelagoShopItem",
+  "title": {
+    "m_TableReference": {
+      "m_TableCollectionName": "Archipelago"
+    },
+    "m_TableEntryReference": {
+      "m_KeyId": 0,
+      "m_Key": "ArchipelagoShopItem_Title"
+    },
+    "m_FallbackState": 0,
+    "m_WaitForCompletion": false,
+    "m_LocalVariables": []
+  },
+  "hideTriggerDescription": true,
+  "usesTriggerDescription": true,
+  "triggerDescription": {
+    "m_TableReference": {
+      "m_TableCollectionName": "Archipelago"
+    },
+    "m_TableEntryReference": {
+      "m_KeyId": 0,
+      "m_Key": "ArchipelagoShopItem_trigger"
+    },
+    "m_FallbackState": 0,
+    "m_WaitForCompletion": false,
+    "m_LocalVariables": []
+  },
+  "usesEffectDescription": true,
+  "description": {
+    "m_TableReference": {
+      "m_TableCollectionName": "Archipelago"
+    },
+    "m_TableEntryReference": {
+      "m_KeyId": 0,
+      "m_Key": "ArchipelagoShopItem_desc"
+    },
+    "m_FallbackState": 0,
+    "m_WaitForCompletion": false,
+    "m_LocalVariables": []
+  },
+  "flavorText": {
+    "m_TableReference": {
+      "m_TableCollectionName": "Archipelago"
+    },
+    "m_TableEntryReference": {
+      "m_KeyId": 0,
+      "m_Key": "ArchipelagoShopItem_flavor"
+    },
+    "m_FallbackState": 0,
+    "m_WaitForCompletion": false,
+    "m_LocalVariables": []
+  },
+  "itemIcon2DOverride": {
+    "instanceID": 0
+  },
+  "iconScaleModifier": 1,
+  "statsAfterTrigger": false,
+  "forcedTooltipTypes": [],
+  "cooldown": 0,
+  "triggerType": 10,
+  "triggerConditions": [],
+  "effects": [],
+  "stats": {
+    "maxHealth": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "maxHealthMultiplier": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "runSpeed": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "airSpeed": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "turnSpeed": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "drag": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "gravity": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "fastFallSpeed": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "fastFallLerp": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "lives": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "dashes": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "boost": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "luck": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "startWithEnergyPercentage": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "maxEnergy": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "itemPriceMultiplier": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "itemRarity": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "sparkMultiplier": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "startingResource": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "energyGain": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "damageMultiplier": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "sparkPickupRange": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "extraLevelSparks": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "extraLevelDifficulty": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "speedDifficultyMultiplier": {
+      "baseValue": 0,
+      "multiplier": 1
+    },
+    "speedLossResistance": {
+      "baseValue": 0,
+      "multiplier": 1
+    }
+  },
+  "effectEvent": {
+    "m_PersistentCalls": {
+      "m_Calls": []
+    }
+  },
+  "keyDownEvent": {
+    "m_PersistentCalls": {
+      "m_Calls": []
+    }
+  },
+  "keyUpEvent": {
+    "m_PersistentCalls": {
+      "m_Calls": []
+    }
+  },
+  "references": {
+    "version": 2,
+    "RefIds": []
+  }
+}

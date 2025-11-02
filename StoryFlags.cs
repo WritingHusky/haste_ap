@@ -20,6 +20,7 @@ namespace StoryFlags
             "TutorialPopUp_Played_EnterShard",
             "TutorialPopUp_Played_CompletedFirstShard",
             "played_OpenItemRemoval",
+            "has_met_animal_fashion",
 
             // Story conversations
             "played_01_StartGame01",

@@ -38,3 +38,14 @@ public enum APFilterMode
     PlayerOnly,
     PlayerAndChat
 }
+
+public enum APLogLocation
+{
+    TopRight,
+    MidRight,
+    BottomRight,
+    TopLeft,
+    MidLeft,
+    BottomLeft,
+    Custom
+}
