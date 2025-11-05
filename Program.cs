@@ -4,6 +4,7 @@ using Landfall.Haste;
 using Landfall.Modding;
 using System.Reflection;
 using System.Threading;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
 using Zorro.Settings;
@@ -91,25 +92,7 @@ public partial class Program
         }
         SetFragmentLimits("Global");
 
-        FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), (value) =>
-        {
-            ApDebugLog.Instance.DisplayMessage($"unbeaten shard update to (zero index){value}");
-            if (connection == null)
-                return;
-
-            var shard_count = connection.GetItemCount("Progressive Shard");
-            // Never allow the value to be not what I want it to be
-            if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
-            {
-                var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
-                // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
-                if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), newvalue);
-            } else
-            {
-                if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), shard_count);
-            }
-        });
-
+        FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
 
         // only need to bother with this once a savefile
         if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
@@ -154,12 +137,14 @@ public partial class Program
         On.ShopItemHandler.GenerateItems += StaticGenerateItemHook;
 
         On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin += StaticPurchaseSkinHook;
+        On.Landfall.Haste.SkinPurchasePopup.OpenPopup += StaticPurchaseSkinOpenHook;
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins += StaticDefaultUnlockedSkinsHook;
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked += StaticMetaProgressionRowAddClickedHook;
-        On.PlayerStats.AddStats += StaticPlayerAddStatsHook;
+        On.Landfall.Haste.MetaProgressionRowUI.RefreshUI += StaticMetaProgressionRefreshUIHook;
+        On.Landfall.Haste.MetaProgression.GetCurrentLevel += StaticMetaProgressionGetCurrentLevelHook;
 
         On.Landfall.Haste.AbilityUnlockScreen.Unlock += StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start += StaticInteractableCharacterStartHook;
@@ -191,6 +176,7 @@ public partial class Program
         On.ShopItemHandler.BuyItem -= StaticBuyItemHook;
         On.ShopItemHandler.GenerateItems -= StaticGenerateItemHook;
         On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin -= StaticPurchaseSkinHook;
+        On.Landfall.Haste.SkinPurchasePopup.OpenPopup -= StaticPurchaseSkinOpenHook;
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins -= StaticDefaultUnlockedSkinsHook;
         On.SaveSystem.Load -= StaticSaveLoadHook;
         On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
@@ -200,7 +186,8 @@ public partial class Program
         On.PlayerCharacter.RestartPlayer_Launch_Transform_float -= StaticSetSpeed;
         On.PlayerCharacter.RestartPlayer_Still_Transform -= StaticSetSpeed;
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked -= StaticMetaProgressionRowAddClickedHook;
-        On.PlayerStats.AddStats -= StaticPlayerAddStatsHook;
+        On.Landfall.Haste.MetaProgressionRowUI.RefreshUI -= StaticMetaProgressionRefreshUIHook;
+        On.Landfall.Haste.MetaProgression.GetCurrentLevel -= StaticMetaProgressionGetCurrentLevelHook;
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
             On.Player.Die -= StaticSendDeathOnDie;
@@ -208,8 +195,29 @@ public partial class Program
             connection.deathLinkService!.DisableDeathLink();
 
         }
+        FactSystem.UnsubscribeFromFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
         UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
         ApDebugLog.Instance.DisplayMessage("AP Hooks Removed");
+    }
+
+    private static void UnbeatedShardHandler(float value)
+    {
+        ApDebugLog.Instance.DisplayMessage($"unbeaten shard update to (zero index){value}");
+        if (connection == null)
+            return;
+
+        var shard_count = connection.GetItemCount("Progressive Shard");
+        // Never allow the value to be not what I want it to be
+        if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
+        {
+            var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
+            // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
+            if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), newvalue);
+        }
+        else
+        {
+            if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), shard_count);
+        }
     }
 
     private static void StaticSetSpeed(On.PlayerCharacter.orig_RestartPlayer_Still_Transform orig, PlayerCharacter self, Transform spawnPoint)
@@ -524,6 +532,7 @@ public partial class Program
         }
         var currentShard = RunHandler.RunData.shardID + 1;
         FactSystem.SetFact(new Fact("APBossDefeated"), Math.Max(FactSystem.GetFact(new Fact("APBossDefeated")), currentShard));
+        SaveSystem.Save();
 
         var boss_location = "Shard " + currentShard + " Boss";
         UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");
@@ -664,79 +673,42 @@ public partial class Program
     }
 
 
-    private static void StaticPlayerAddStatsHook(On.PlayerStats.orig_AddStats orig, PlayerStats self, PlayerStats otherStats, float multiplier)
+    private static MetaProgression.EntryLevel StaticMetaProgressionGetCurrentLevelHook(On.Landfall.Haste.MetaProgression.orig_GetCurrentLevel orig, MetaProgression.Entry entry)
     {
         if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
         {
-            //ApDebugLog.Instance.DisplayMessage($"incoming health: {otherStats.maxHealth.baseValue}, {self.maxHealth.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"incoming lives: {otherStats.lives.baseValue}, {self.lives.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"incoming energy: {otherStats.maxEnergy.baseValue}, {self.maxEnergy.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"incoming l sparks: {otherStats.extraLevelSparks.baseValue}, {self.extraLevelSparks.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"incoming rarity: {otherStats.itemRarity.baseValue}, {self.itemRarity.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"incoming resource: {otherStats.startingResource.baseValue}, {self.startingResource.baseValue}");
-            float calcmaxHealth = 80f + (10 * FactSystem.GetFact(new Fact("APUpgradeMaxHealth")));
-            float calclives = 3f + FactSystem.GetFact(new Fact("APUpgradeMaxLives"));
-            float calcmaxEnergy = 0.5f + (0.2f * FactSystem.GetFact(new Fact("APUpgradeMaxEnergy")));
-            // THESE next two might need some value tweaking, i think these are wrong and might need to just be 1 mults the whole way down
-            float calcextraLevelSparks = (40f * FactSystem.GetFact(new Fact("APUpgradeLevelSparks")));
-            float calcitemRarity = (0.25f * FactSystem.GetFact(new Fact("APUpgradeItemRarity")));
-            float calcstartingResource = (float)FactSystem.GetFact(new Fact("APUpgradeStartingSparks")) switch
-            {
-                1f => 100f,
-                2f => 250f,
-                3f => 500f,
-                _ => 150f * FactSystem.GetFact(new Fact("APUpgradeStartingSparks")),
-            };
-            //ApDebugLog.Instance.DisplayMessage($"calc health: {calcmaxHealth}");
-            //ApDebugLog.Instance.DisplayMessage($"calc lives: {calclives}");
-            //ApDebugLog.Instance.DisplayMessage($"calc energy: {calcmaxEnergy}");
-            //ApDebugLog.Instance.DisplayMessage($"calc l sparks: {calcextraLevelSparks}");
-            //ApDebugLog.Instance.DisplayMessage($"calc rarity: {calcitemRarity}");
-            //ApDebugLog.Instance.DisplayMessage($"calc resource: {calcstartingResource}");
-            otherStats.maxHealth.baseValue = (self.maxHealth.baseValue < calcmaxHealth) ? calcmaxHealth : otherStats.maxHealth.baseValue;
-            otherStats.lives.baseValue = (self.lives.baseValue < calclives) ? calclives : otherStats.lives.baseValue;
-            otherStats.maxEnergy.baseValue = (self.maxEnergy.baseValue < calcmaxEnergy) ? calcmaxEnergy : otherStats.maxEnergy.baseValue;
-            otherStats.extraLevelSparks.baseValue = (self.extraLevelSparks.baseValue < 200f + calcextraLevelSparks) ? calcextraLevelSparks : otherStats.extraLevelSparks.baseValue;
-            otherStats.itemRarity.baseValue = (self.itemRarity.baseValue < calcitemRarity) ? calcitemRarity : otherStats.itemRarity.baseValue;
-            otherStats.startingResource.baseValue = (self.startingResource.baseValue <= calcstartingResource) ? calcstartingResource : otherStats.startingResource.baseValue;
-            //ApDebugLog.Instance.DisplayMessage($"outgoing health: {otherStats.maxHealth.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"outgoing lives: {otherStats.lives.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"outgoing energy: {otherStats.maxEnergy.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"outgoing l sparks: {otherStats.extraLevelSparks.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"outgoing rarity: {otherStats.itemRarity.baseValue}");
-            //ApDebugLog.Instance.DisplayMessage($"outgoing resource: {otherStats.startingResource.baseValue}");
-            self.maxHealth.AddStat(otherStats.maxHealth, multiplier);
-            self.lives.AddStat(otherStats.lives, multiplier);
-            self.maxEnergy.AddStat(otherStats.maxEnergy, multiplier);
-            self.extraLevelSparks.AddStat(otherStats.extraLevelSparks, multiplier);
-            self.itemRarity.AddStat(otherStats.itemRarity, multiplier);
-            self.startingResource.AddStat(otherStats.startingResource, multiplier);
-
-
-
-            self.maxHealthMultiplier.AddStat(otherStats.maxHealthMultiplier, multiplier);
-            self.runSpeed.AddStat(otherStats.runSpeed, multiplier);
-            self.airSpeed.AddStat(otherStats.airSpeed, multiplier);
-            self.turnSpeed.AddStat(otherStats.turnSpeed, multiplier);
-            self.drag.AddStat(otherStats.drag, multiplier);
-            self.gravity.AddStat(otherStats.gravity, multiplier);
-            self.fastFallSpeed.AddStat(otherStats.fastFallSpeed, multiplier);
-            self.fastFallLerp.AddStat(otherStats.fastFallLerp, multiplier);
-            self.dashes.AddStat(otherStats.dashes, multiplier);
-            self.boost.AddStat(otherStats.boost, multiplier);
-            self.luck.AddStat(otherStats.luck, multiplier);
-            self.startWithEnergyPercentage.AddStat(otherStats.startWithEnergyPercentage, multiplier);
-            self.itemPriceMultiplier.AddStat(otherStats.itemPriceMultiplier, multiplier);
-            self.sparkMultiplier.AddStat(otherStats.sparkMultiplier, multiplier);
-            self.energyGain.AddStat(otherStats.energyGain, multiplier);
-            self.damageMultiplier.AddStat(otherStats.damageMultiplier, multiplier);
-            self.sparkPickupRange.AddStat(otherStats.sparkPickupRange, multiplier);
-            self.extraLevelDifficulty.AddStat(otherStats.extraLevelDifficulty, multiplier);
-            self.speedDifficultyMultiplier.AddStat(otherStats.speedDifficultyMultiplier, multiplier);
+            return entry.levels[Math.Min((int)FactSystem.GetFact(new Fact(ConvertCaptainsInternalName(entry.fact))), entry.levels.Length-1)];
         }
         else
         {
-            orig(self, otherStats, multiplier);
+            return orig(entry);
+        }
+
+    }
+
+
+    private static void StaticMetaProgressionRefreshUIHook(On.Landfall.Haste.MetaProgressionRowUI.orig_RefreshUI orig, MetaProgressionRowUI self)
+    {
+        orig(self);
+        if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
+        {
+            // grab StatType text from parent gameobject
+            Transform StatType = self.gameObject.transform.Find("StatType");
+            // hide old text
+            Transform Amount = self.gameObject.transform.Find("Amount");
+            Amount.gameObject.SetActive(false);
+
+            var rowText = StatType.gameObject.GetComponent<TextMeshProUGUI>();
+            ApDebugLog.Instance.DisplayMessage($"chaning data for row {rowText.text} of obj {rowText.GetInstanceID()}");
+            // type reflection to get around private values being annoying 
+            Type metaRowType = typeof(MetaProgressionRowUI);
+            FieldInfo entryField = metaRowType.GetField("_entry", BindingFlags.NonPublic | BindingFlags.Instance);
+            var entry = entryField.GetValue(self) as MetaProgression.Entry;
+
+            var locationData = connection.RetrieiveLocationData(GetCaptainUpgradeName(self.kind.ToString(), Math.Min(entry.CurrentLevel, entry.levels.Length-2)));
+            rowText.text = $"{locationData.Item1} for {locationData.Item2}";
+            rowText.rectTransform.offsetMax = new Vector2(-188f, rowText.rectTransform.offsetMax.y);
+            ApDebugLog.Instance.DisplayMessage($"changes complete for {rowText.text} of obj {rowText.GetInstanceID()}");
         }
     }
 
@@ -749,10 +721,25 @@ public partial class Program
         }
         if (FactSystem.GetFact(new Fact("APFashionPurchases")) >= 1f)
         {
-            connection.SendLocation($"{GetFashionPurchaseName(self.skin.Skin)} Costume Purchase");
+            connection.SendLocation($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
         }
         orig(self);
 
+    }
+
+    private static void StaticPurchaseSkinOpenHook(On.Landfall.Haste.SkinPurchasePopup.orig_OpenPopup orig, SkinPurchasePopup self, SkinDatabaseEntry skin)
+    {
+        orig(self, skin);
+        if (FactSystem.GetFact(new Fact("APFashionPurchases")) >= 1f)
+        {
+            if (connection == null)
+            {
+                ApDebugLog.Instance.DisplayMessage("AP On Skin Popup Open the connection is null");
+                return;
+            };
+            var locationData = connection.RetrieiveLocationData($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
+            self.headerLabel.text = $"{locationData.Item1} for {locationData.Item2}";
+        }
     }
 
     private static void StaticDefaultUnlockedSkinsHook(On.Landfall.Haste.SkinManager.orig_SetDefaultUnlockedSkins orig)

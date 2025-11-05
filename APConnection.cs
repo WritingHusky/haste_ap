@@ -302,6 +302,8 @@ public class Connection(string hostname, int port)
                     SkinManager.UnlockSkin(SkinManager.Skin.DarkClown);
                     SkinManager.UnpurchaseSkin(SkinManager.Skin.Green);
                     SkinManager.UnpurchaseSkin(SkinManager.Skin.Blue);
+                    SkinManager.UnlockSkin(SkinManager.Skin.Green);
+                    SkinManager.UnlockSkin(SkinManager.Skin.Blue);
                     // manually unlocks Zoe64 and Shadow since the default unlocker is bypassed
                     SkinManager.UnlockSkin(SkinManager.Skin.Zoe64);
                     SkinManager.UnlockSkin(SkinManager.Skin.Shadow);
@@ -313,6 +315,8 @@ public class Connection(string hostname, int port)
                     // weird guys
                     SkinManager.UnpurchaseSkin(SkinManager.Skin.Green);
                     SkinManager.UnpurchaseSkin(SkinManager.Skin.Blue);
+                    SkinManager.UnlockSkin(SkinManager.Skin.Green);
+                    SkinManager.UnlockSkin(SkinManager.Skin.Blue);
                 }
             }
         }
@@ -406,6 +410,24 @@ public class Connection(string hostname, int port)
         }
     }
 
+    public (string, string) RetrieiveLocationData(string locationName)
+    {
+        UnityMainThreadDispatcher.Instance().log($"Retrieivng location {locationName}");
+        ApDebugLog.Instance.DisplayMessage($"Retrieivng location {locationName}");
+        long locationID = session.Locations.GetLocationIdFromName(game, locationName);
+        if (locationID != -1)
+        {
+            var locationInfo = session.Locations.ScoutLocationsAsync(hintCreationPolicy: HintCreationPolicy.None, locationID);
+            return (locationInfo.Result[locationID].ItemName, locationInfo.Result[locationID].Player.ToString());
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> No locationID for hint location: {locationName}", isDebug: false, duration: 15f);
+            return ($"ERROR: Could not find location {locationName}", "UNKNOWN");
+        }
+    }
+
     public void Close()
     {
         UnityMainThreadDispatcher.Instance().log("AP Disconnecting");
@@ -414,7 +436,7 @@ public class Connection(string hostname, int port)
         ApDebugLog.Instance.DisplayMessage($"AP Disconnected", isDebug:false);
     }
 
-    public void BuildItemReciver(Action<string> GiveItem)
+    public void BuildItemReciver(Action<string, string> GiveItem)
     {
 
         UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
@@ -444,8 +466,8 @@ public class Connection(string hostname, int port)
                 }
 
                 UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName}");
-                ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} with index {receivedItemsHelper.Index}");
-                GiveItem(itemReceivedInfo.ItemName);
+                ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {receivedItemsHelper.Index}");
+                GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
                 FactSystem.AddToFact(new Fact("APExpectedIndex"), 1);
                 SaveSystem.Save();
 

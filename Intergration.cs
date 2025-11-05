@@ -4,6 +4,11 @@ using System.Reflection;
 using UnityEngine.SceneManagement;
 using Zorro.Core;
 using Zorro.Settings;
+using UnityEngine;
+using TMPro;
+using System.Collections;
+using IL.UnityEngine.UIElements;
+using System.Runtime.CompilerServices;
 
 namespace Integration
 {
@@ -27,10 +32,11 @@ namespace Integration
             SaveSystem.Save();
         }
 
-        public static void GiveItem(string itemName)
+        public static void GiveItem(string itemName, string givingPlayerName)
         {
             UnityMainThreadDispatcher.Instance().log("AP Trying to give (" + itemName + ")");
             ApDebugLog.Instance.DisplayMessage($"Giving item: {itemName}");
+            bool worthMentioning = false;
 
             try
             {
@@ -42,6 +48,7 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Shard");
                         // Increase the number of shards that the player can use
                         UpdateShardCount();
+                        worthMentioning = true;
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -59,6 +66,7 @@ namespace Integration
                         FactSystem.SetFact(MetaProgression.SlomoUnlocked, 1f);
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
+                        worthMentioning = true;
                         break;
                     case "Heir's Javelin":
                         UnityMainThreadDispatcher.Instance().log("AP Got Abilty Grapple");
@@ -66,6 +74,7 @@ namespace Integration
                         FactSystem.SetFact(MetaProgression.GrappleUnlocked, 1f);
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
+                        worthMentioning = true;
                         break;
                     case "Sage's Cowl":
                         UnityMainThreadDispatcher.Instance().log("AP Got Abilty Fly");
@@ -73,11 +82,13 @@ namespace Integration
                         FactSystem.SetFact(MetaProgression.FlyUnlocked, 1f);
                         MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
+                        worthMentioning = true;
                         break;
                     case "Wraith":
                         UnityMainThreadDispatcher.Instance().log("AP Got Wraith");
                         ApDebugLog.Instance.DisplayMessage("Got Wraith in hub");
                         FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
+                        worthMentioning = true;
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -88,6 +99,7 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Niada");
                         ApDebugLog.Instance.DisplayMessage("Got Niada in hub");
                         FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
+                        worthMentioning = true;
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -98,6 +110,7 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Daro");
                         ApDebugLog.Instance.DisplayMessage("Got Daro in hub");
                         FactSystem.SetFact(new Fact("APSageInHub"), 1f);
+                        worthMentioning = true;
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -108,6 +121,7 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got The Captain");
                         ApDebugLog.Instance.DisplayMessage("Got The Captain");
                         FactSystem.SetFact(new Fact("APCaptainInHub"), 1f);
+                        worthMentioning = true;
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -118,6 +132,7 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Fashion Weeboh");
                         ApDebugLog.Instance.DisplayMessage("Got Fashion Weeboh");
                         FactSystem.SetFact(new Fact("APFashionInHub"), 1f);
+                        worthMentioning = true;
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -128,41 +143,48 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Progressive Speed Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Progressive Speed Upgrade");
                         FactSystem.AddToFact(new Fact("APSpeedUpgradesCollected"), 1f);
+                        worthMentioning = true;
                         break;
                     case "Max Health Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Max Health Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Max Health Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxHealth"), 1f);
+                        worthMentioning = true;
                         Player.localPlayer.ResetStats();
                         break;
                     case "Max Lives Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Extra Lives Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Extra Lives Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxLives"), 1f);
+                        worthMentioning = true;
                         Player.localPlayer.ResetStats();
                         break;
                     case "Max Energy Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Max Energy Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Max Energy Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxEnergy"), 1f);
+                        worthMentioning = true;
                         Player.localPlayer.ResetStats();
                         break;
-                    case "Sparks in Shard Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Sparks in Shard Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Sparks in Shard Upgrade");
+                    case "Sparks in Fragments Upgrade":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Sparks in Fragments Upgrade");
+                        ApDebugLog.Instance.DisplayMessage("Got Sparks in Fragments Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeLevelSparks"), 1f);
+                        worthMentioning = true;
                         Player.localPlayer.ResetStats();
                         break;
                     case "Item Rarity Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Item Rarity Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Item Rarity Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeItemRarity"), 1f);
+                        worthMentioning = true;
                         Player.localPlayer.ResetStats();
                         break;
                     case "Starting Sparks Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Starting Sparks Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Starting Sparks Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeStartingSparks"), 1f);
+                        worthMentioning = true;
                         Player.localPlayer.ResetStats();
                         break;
                     case "Anti-Spark 10 bundle":
@@ -209,12 +231,32 @@ namespace Integration
                     ApDebugLog.Instance.DisplayMessage($"Error within give item {e.Message},{e.StackTrace}", duration: 10f);
                 }
             }
+            if (worthMentioning) MonoFunctions.instance.StartCoroutine(ItemPopup(itemName, givingPlayerName));
+
             //SaveSystem.Save();
         }
 
         public static void AbilityTutorial()
         {
             Singleton<TutorialPopUpHandler>.Instance.TriggerPopUp(TutorialType.Abilities);
+        }
+
+        public static IEnumerator ItemPopup(string itemName, string givingPlayer)
+        {
+            yield return new WaitForSeconds(0.25f);
+            //NotificationHandler.Instance
+            var inst = Singleton<NotificationHandler>.Instance;
+            ApDebugLog.Instance.DisplayMessage($"attempting fake notificationprefab");
+            GameObject notificationPrefab = inst.notificationPrefabs.Find((GameObject n) => n.GetComponent<NotificationMessage>() is FragmentModifierNotification);
+            ApDebugLog.Instance.DisplayMessage($"attempting fake fragmentnotification with {notificationPrefab.name}");
+            FragmentModifierNotification fragmentModifierNotification = inst.SpawnNotification(notificationPrefab) as FragmentModifierNotification;
+            ApDebugLog.Instance.DisplayMessage($"attempting text modifications");
+            fragmentModifierNotification.EffectDescription.text = $"{itemName}";
+            fragmentModifierNotification.EffectDescription.rectTransform.localPosition = new Vector3(-16f, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.y, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.z);
+
+            fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Header").gameObject.GetComponent<TextMeshProUGUI>().text = $"Item from {givingPlayer}";
+            fragmentModifierNotification.IconImage.gameObject.SetActive(false);
+            fragmentModifierNotification.animator.SetBool("Play", true);
         }
 
         public static void GiveDeath(DeathLink death)
@@ -279,68 +321,58 @@ namespace Integration
 
         public static string GetAbilityName(string internalname)
         {
-            switch (internalname)
+            return internalname switch
             {
-                case "Slomo":
-                    return "Wraith's Hourglass";
-                case "Grapple":
-                    return "Heir's Javelin";
-                case "Fly":
-                    return "Sage's Cowl";
-                default:
-                    return "NOT FOUND";
-
-            }
+                "Slomo" => "Wraith's Hourglass",
+                "Grapple" => "Heir's Javelin",
+                "Fly" => "Sage's Cowl",
+                _ => "NOT FOUND",
+            };
         }
 
         public static string GetCaptainUpgradeName(string internalname, int currentlevel)
         {
-            switch (internalname)
+            return internalname switch
             {
-                case "MaxHealth":
-                    return $"Captain's Max Health Upgrade Purchase {currentlevel + 1}";
-                case "Lives":
-                    return $"Captain's Max Lives Upgrade Purchase";
-                case "MaxEnergy":
-                    return $"Captain's Max Energy Upgrade Purchase {currentlevel + 1}";
-                case "ItemRarity":
-                    return $"Captain's Item Rarity Upgrade Purchase {currentlevel + 1}";
-                case "LevelSparks":
-                    return $"Captain's Sparks in Shard Upgrade Purchase {currentlevel + 1}";
-                case "StartingResource":
-                    return $"Captain's Starting Sparks Upgrade Purchase {currentlevel + 1}";
-                default:
-                    return "NOT FOUND";
-            }
+                "MaxHealth" => $"Captain's Max Health Upgrade Purchase {currentlevel + 1}",
+                "Lives" => $"Captain's Max Lives Upgrade Purchase",
+                "MaxEnergy" => $"Captain's Max Energy Upgrade Purchase {currentlevel + 1}",
+                "ItemRarity" => $"Captain's Item Rarity Upgrade Purchase {currentlevel + 1}",
+                "LevelSparks" => $"Captain's Sparks in Fragments Upgrade Purchase {currentlevel + 1}",
+                "StartingResource" => $"Captain's Starting Sparks Upgrade Purchase {currentlevel + 1}",
+                _ => "NOT FOUND",
+            };
+        }
+
+        public static string ConvertCaptainsInternalName(string fact)
+        {
+            return fact switch
+            {
+                "meta_progression_max_health" => "APUpgradeMaxHealth",
+                "meta_progression_max_energy" => "APUpgradeMaxEnergy",
+                "meta_progression_lives" => "APUpgradeMaxLives",
+                "meta_progression_item_rarity" => "APUpgradeItemRarity",
+                "meta_progression_level_sparks" => "APUpgradeLevelSparks",
+                "meta_progression_starting_resource" => "APUpgradeStartingSparks",
+                _ => "NOT FOUND",
+            };
         }
 
         public static string GetFashionPurchaseName(SkinManager.Skin skin)
         {
-            switch (skin)
+            return skin switch
             {
-                case SkinManager.Skin.Crispy:
-                    return "Crispy";
-                case SkinManager.Skin.Green:
-                    return "Little Sister";
-                case SkinManager.Skin.Blue:
-                    return "Supersonic Zoe";
-                case SkinManager.Skin.Shadow:
-                    return "Zoe the Shadow";
-                case SkinManager.Skin.Wobbler:
-                    return "Totally Accurate Zoe";
-                case SkinManager.Skin.Clown:
-                    return "Flopsy";
-                case SkinManager.Skin.DarkClown:
-                    return "Twisted Flopsy";
-                case SkinManager.Skin.Weeboh:
-                    return "Weeboh";
-                case SkinManager.Skin.Zoe64:
-                    return "Zoe 64";
-                default:
-                    return "NOT FOUND";
-
-            }
-
+                SkinManager.Skin.Crispy => "Crispy",
+                SkinManager.Skin.Green => "Little Sister",
+                SkinManager.Skin.Blue => "Supersonic Zoe",
+                SkinManager.Skin.Shadow => "Zoe the Shadow",
+                SkinManager.Skin.Wobbler => "Totally Accurate Zoe",
+                SkinManager.Skin.Clown => "Flopsy",
+                SkinManager.Skin.DarkClown => "Twisted Flopsy",
+                SkinManager.Skin.Weeboh => "Weeboh",
+                SkinManager.Skin.Zoe64 => "Zoe 64",
+                _ => "NOT FOUND",
+            };
         }
     }
 }
