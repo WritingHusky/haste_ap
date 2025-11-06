@@ -37,6 +37,7 @@ namespace Integration
             UnityMainThreadDispatcher.Instance().log("AP Trying to give (" + itemName + ")");
             ApDebugLog.Instance.DisplayMessage($"Giving item: {itemName}");
             bool worthMentioning = false;
+            int? quantity = null;
 
             try
             {
@@ -49,6 +50,7 @@ namespace Integration
                         // Increase the number of shards that the player can use
                         UpdateShardCount();
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Progressive Shard");
                         if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
                         {
                             UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
@@ -144,12 +146,14 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Progressive Speed Upgrade");
                         FactSystem.AddToFact(new Fact("APSpeedUpgradesCollected"), 1f);
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Progressive Speed Upgrade");
                         break;
                     case "Max Health Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Max Health Upgrade");
                         ApDebugLog.Instance.DisplayMessage("Got Max Health Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxHealth"), 1f);
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Max Health Upgrade");
                         Player.localPlayer.ResetStats();
                         break;
                     case "Max Lives Upgrade":
@@ -164,6 +168,7 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Max Energy Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxEnergy"), 1f);
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Max Energy Upgrade");
                         Player.localPlayer.ResetStats();
                         break;
                     case "Sparks in Fragments Upgrade":
@@ -171,6 +176,7 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Sparks in Fragments Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeLevelSparks"), 1f);
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Sparks in Fragments Upgrade");
                         Player.localPlayer.ResetStats();
                         break;
                     case "Item Rarity Upgrade":
@@ -178,6 +184,7 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Item Rarity Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeItemRarity"), 1f);
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Item Rarity Upgrade");
                         Player.localPlayer.ResetStats();
                         break;
                     case "Starting Sparks Upgrade":
@@ -185,6 +192,7 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Starting Sparks Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeStartingSparks"), 1f);
                         worthMentioning = true;
+                        quantity = connection!.GetItemCount("Starting Sparks Upgrade");
                         Player.localPlayer.ResetStats();
                         break;
                     case "Anti-Spark 10 bundle":
@@ -231,7 +239,7 @@ namespace Integration
                     ApDebugLog.Instance.DisplayMessage($"Error within give item {e.Message},{e.StackTrace}", duration: 10f);
                 }
             }
-            if (worthMentioning) MonoFunctions.instance.StartCoroutine(ItemPopup(itemName, givingPlayerName));
+            if (worthMentioning) MonoFunctions.instance.StartCoroutine(ItemPopup(itemName, givingPlayerName, quantity));
 
             //SaveSystem.Save();
         }
@@ -241,21 +249,20 @@ namespace Integration
             Singleton<TutorialPopUpHandler>.Instance.TriggerPopUp(TutorialType.Abilities);
         }
 
-        public static IEnumerator ItemPopup(string itemName, string givingPlayer)
+        public static IEnumerator ItemPopup(string itemName, string givingPlayer, int? quantity)
         {
-            yield return new WaitForSeconds(0.25f);
+            yield return new WaitForSeconds(1f);
             //NotificationHandler.Instance
             var inst = Singleton<NotificationHandler>.Instance;
-            ApDebugLog.Instance.DisplayMessage($"attempting fake notificationprefab");
             GameObject notificationPrefab = inst.notificationPrefabs.Find((GameObject n) => n.GetComponent<NotificationMessage>() is FragmentModifierNotification);
-            ApDebugLog.Instance.DisplayMessage($"attempting fake fragmentnotification with {notificationPrefab.name}");
             FragmentModifierNotification fragmentModifierNotification = inst.SpawnNotification(notificationPrefab) as FragmentModifierNotification;
-            ApDebugLog.Instance.DisplayMessage($"attempting text modifications");
             fragmentModifierNotification.EffectDescription.text = $"{itemName}";
+            if (quantity != null) fragmentModifierNotification.EffectDescription.text += $" <style=+s>{quantity}</style>#";
             fragmentModifierNotification.EffectDescription.rectTransform.localPosition = new Vector3(-16f, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.y, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.z);
 
             fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Header").gameObject.GetComponent<TextMeshProUGUI>().text = $"Item from {givingPlayer}";
             fragmentModifierNotification.IconImage.gameObject.SetActive(false);
+            fragmentModifierNotification.animator.Play("NotificationMessageIn");
             fragmentModifierNotification.animator.SetBool("Play", true);
         }
 

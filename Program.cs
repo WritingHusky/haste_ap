@@ -139,6 +139,7 @@ public partial class Program
         On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin += StaticPurchaseSkinHook;
         On.Landfall.Haste.SkinPurchasePopup.OpenPopup += StaticPurchaseSkinOpenHook;
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins += StaticDefaultUnlockedSkinsHook;
+        On.Landfall.Haste.SkinManager.SetFullOutfit += StaticSetFullOutfitHook;
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
@@ -164,6 +165,7 @@ public partial class Program
         orig();
     }
 
+
     /// <summary>
     /// Extra function to remove hooks on exiting the game, so that new hooks arent accidentally installed ontop of existing ones
     /// </summary>
@@ -178,6 +180,7 @@ public partial class Program
         On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin -= StaticPurchaseSkinHook;
         On.Landfall.Haste.SkinPurchasePopup.OpenPopup -= StaticPurchaseSkinOpenHook;
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins -= StaticDefaultUnlockedSkinsHook;
+        On.Landfall.Haste.SkinManager.SetFullOutfit -= StaticSetFullOutfitHook;
         On.SaveSystem.Load -= StaticSaveLoadHook;
         On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
@@ -249,7 +252,6 @@ public partial class Program
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
         UnityMainThreadDispatcher.Instance().log("AP Player death Hooked");
-        ApDebugLog.Instance.DisplayMessage($"Source: {FactSystem.GetFact(new Fact("APDoubleKillStopper"))}");
         if (FactSystem.GetFact(new Fact("APDoubleKillStopper")) == 1f)
         {
             // this kill came from deathlink, so just kill the player but avoid the re-sending of another deathlink
@@ -699,7 +701,7 @@ public partial class Program
             Amount.gameObject.SetActive(false);
 
             var rowText = StatType.gameObject.GetComponent<TextMeshProUGUI>();
-            ApDebugLog.Instance.DisplayMessage($"chaning data for row {rowText.text} of obj {rowText.GetInstanceID()}");
+            //ApDebugLog.Instance.DisplayMessage($"chaning data for row {rowText.text} of obj {rowText.GetInstanceID()}");
             // type reflection to get around private values being annoying 
             Type metaRowType = typeof(MetaProgressionRowUI);
             FieldInfo entryField = metaRowType.GetField("_entry", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -708,7 +710,7 @@ public partial class Program
             var locationData = connection.RetrieiveLocationData(GetCaptainUpgradeName(self.kind.ToString(), Math.Min(entry.CurrentLevel, entry.levels.Length-2)));
             rowText.text = $"{locationData.Item1} for {locationData.Item2}";
             rowText.rectTransform.offsetMax = new Vector2(-188f, rowText.rectTransform.offsetMax.y);
-            ApDebugLog.Instance.DisplayMessage($"changes complete for {rowText.text} of obj {rowText.GetInstanceID()}");
+            //ApDebugLog.Instance.DisplayMessage($"changes complete for {rowText.text} of obj {rowText.GetInstanceID()}");
         }
     }
 
@@ -724,7 +726,6 @@ public partial class Program
             connection.SendLocation($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
         }
         orig(self);
-
     }
 
     private static void StaticPurchaseSkinOpenHook(On.Landfall.Haste.SkinPurchasePopup.orig_OpenPopup orig, SkinPurchasePopup self, SkinDatabaseEntry skin)
@@ -739,6 +740,16 @@ public partial class Program
             };
             var locationData = connection.RetrieiveLocationData($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
             self.headerLabel.text = $"{locationData.Item1} for {locationData.Item2}";
+        }
+    }
+
+
+    private static void StaticSetFullOutfitHook(On.Landfall.Haste.SkinManager.orig_SetFullOutfit orig, SkinManager.Skin skin)
+    {
+        if (FactSystem.GetFact(new Fact("APFashionPurchases")) == 0f)
+        {
+            // dont set costume when purchasing a check (so players can keep their YAML defaults)
+            orig(skin);
         }
     }
 

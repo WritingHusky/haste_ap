@@ -363,7 +363,21 @@ public class Connection(string hostname, int port)
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get CaptainsUpgrades from slot data:" + loginSuccess.SlotData.toJson());
         }
 
-        
+        if (loginSuccess.SlotData.TryGetValue("Unlock All Items", out object UnlockAllItems))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found UnlockAllItems in slot data with value: {UnlockAllItems}");
+            if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f && Convert.ToSingle(UnlockAllItems) == 1)
+            {
+                //only unlock once
+                ItemDatabase.UnlockAll();
+            }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get UnlockAllItems from slot data:" + loginSuccess.SlotData.toJson());
+        }
+
+
 
 
         // get the AP Debug Log settings.
