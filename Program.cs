@@ -15,7 +15,7 @@ public partial class Program
 {
     private static Connection? connection;
 
-    private static readonly Version version = new(0, 3, 0);
+    private static readonly Version version = new(0, 3, 2);
 
     static Program()
     {
