@@ -6,8 +6,6 @@ using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
 using UnityEngine.Purchasing.MiniJSON;
 using Zorro.Settings;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace APConnection;
 
@@ -504,6 +502,7 @@ public class Connection(string hostname, int port)
 
     public void SendTaglinkPacket(int currentAbility)
     {
+         // TODO: actually test that this sends
         BouncePacket packet = new()
         {
             Tags = ["TagLink"],
