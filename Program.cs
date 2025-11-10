@@ -73,7 +73,7 @@ public partial class Program
 
         // This must go BEFORE connection
         connection.BuildItemReciver(GiveItem);
-        connection.buildMessageReciver();
+        connection.BuildMessageReciver();
 
         if (!connection.Connect(username, password, version))
         {

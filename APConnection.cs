@@ -2,9 +2,12 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Colors;
 using Archipelago.MultiClient.Net.Enums;
+using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
 using UnityEngine.Purchasing.MiniJSON;
 using Zorro.Settings;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace APConnection;
 
@@ -499,7 +502,24 @@ public class Connection(string hostname, int port)
         };
     }
 
-    public void buildMessageReciver()
+    public void SendTaglinkPacket(int currentAbility)
+    {
+        BouncePacket packet = new()
+        {
+            Tags = ["TagLink"],
+            Data = new()
+            {
+                { "time", (long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds },
+                { "source", session.ConnectionInfo.Slot },
+                { "tag", false },
+                { "kong", currentAbility }
+            }
+        };
+
+        session.Socket.SendPacket(packet);
+    }
+
+    public void BuildMessageReciver()
     {
         session.MessageLog.OnMessageReceived += (message) =>
         {

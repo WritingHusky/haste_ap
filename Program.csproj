@@ -25,19 +25,21 @@
     <ItemGroup>
         <!-- Reference all DLLs in the game. If you do not actually use anything in a DLL,
          that DLL will not get referenced in your compiled mod, so it's fine to just reference everything.
-         Private="False" means that the referenced DLLs will not get copied to the output directory. -->
         <Reference Include="$(HasteDlls)" Private="false" />
+         Private="False" means that the referenced DLLs will not get copied to the output directory. 
+         Haste's internal Newtonsoft is manually excluded to prevent conflicts with Multiclient. -->
+        <Reference Include="$(HasteDlls)" Private="false" Exclude="G:\Program Files (x86)\Steam\steamapps\common\Haste\Haste_Data\Managed\Newtonsoft.Json.dll"/>
         <!-- Harmony -->
         <!-- <Reference Include="C:\Program Files (x86)\Steam\steamapps\workshop\content\1796470\3385184093\*.dll" Private="false"/> -->
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Archipelago.MultiClient.Net" Version="6.6.0" />
-      <PackageReference Include="Archipelago.MultiClient.Net.Analyzers" Version="1.3.0">
+      <PackageReference Include="Archipelago.MultiClient.Net" Version="6.7.0" />
+      <PackageReference Include="Archipelago.MultiClient.Net.Analyzers" Version="1.5.0">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
-      <PackageReference Include="Krafs.Publicizer" Version="2.0.0">
+      <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         <PrivateAssets>all</PrivateAssets>
       </PackageReference>
