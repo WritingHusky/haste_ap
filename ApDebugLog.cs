@@ -38,7 +38,7 @@ public class ApDebugLog : MonoBehaviour
     public bool customMessagesGoDown = true;
     public TextAlignmentOptions customAlignmentMode = TextAlignmentOptions.Left;
 
-    public APLogLocation windowPosition = APLogLocation.TopRight;
+    public APLogLocation windowPosition = APLogLocation.TopLeft;
 
     public TextAlignmentOptions alignmentMode = TextAlignmentOptions.Left;
     public ColorizedMode colorizedMode = ColorizedMode.Colorized;
@@ -101,7 +101,7 @@ public class ApDebugLog : MonoBehaviour
     {
         switch (windowPosition)
         {
-            case APLogLocation.TopRight:
+            case APLogLocation.TopLeft:
                 yBaseOffset = -150f;
                 xBaseOffset = 20f;
                 ancMin = new Vector2(0, 1);
@@ -110,7 +110,7 @@ public class ApDebugLog : MonoBehaviour
                 alignmentMode = TextAlignmentOptions.Left;
                 messagesGoDown = true;
                 break;
-            case APLogLocation.MidRight:
+            case APLogLocation.MidLeft:
                 yBaseOffset = -Screen.height / 3;
                 xBaseOffset = 20f;
                 ancMin = new Vector2(0, 1);
@@ -119,7 +119,7 @@ public class ApDebugLog : MonoBehaviour
                 alignmentMode = TextAlignmentOptions.Left;
                 messagesGoDown = true;
                 break;
-            case APLogLocation.BottomRight:
+            case APLogLocation.BottomLeft:
                 yBaseOffset = -Screen.height + 50f;
                 xBaseOffset = 20f;
                 ancMin = new Vector2(0, 1);
@@ -128,7 +128,7 @@ public class ApDebugLog : MonoBehaviour
                 alignmentMode = TextAlignmentOptions.Left;
                 messagesGoDown = false;
                 break;
-            case APLogLocation.TopLeft:
+            case APLogLocation.TopRight:
                 yBaseOffset = -150f;
                 xBaseOffset = -20f;
                 ancMin = new Vector2(1, 1);
@@ -137,7 +137,7 @@ public class ApDebugLog : MonoBehaviour
                 alignmentMode = TextAlignmentOptions.Right;
                 messagesGoDown = true;
                 break;
-            case APLogLocation.MidLeft:
+            case APLogLocation.MidRight:
                 yBaseOffset = -Screen.height / 3;
                 xBaseOffset = -20f;
                 ancMin = new Vector2(1, 1);
@@ -146,7 +146,7 @@ public class ApDebugLog : MonoBehaviour
                 alignmentMode = TextAlignmentOptions.Right;
                 messagesGoDown = true;
                 break;
-            case APLogLocation.BottomLeft:
+            case APLogLocation.BottomRight:
                 yBaseOffset = -Screen.height + 50f;
                 xBaseOffset = -20f;
                 ancMin = new Vector2(1, 1);

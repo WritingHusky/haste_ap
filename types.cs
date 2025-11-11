@@ -41,11 +41,11 @@ public enum APFilterMode
 
 public enum APLogLocation
 {
-    TopRight,
-    MidRight,
-    BottomRight,
     TopLeft,
     MidLeft,
     BottomLeft,
+    TopRight,
+    MidRight,
+    BottomRight,
     Custom
 }
