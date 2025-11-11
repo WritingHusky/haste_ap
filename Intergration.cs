@@ -44,6 +44,9 @@ namespace Integration
 
                 switch (itemName)
                 {
+                    case "A New Future":
+                        // wincon item, ignore
+                        break;
                     case "Progressive Shard":
                         UnityMainThreadDispatcher.Instance().log("AP Got a Shard!");
                         ApDebugLog.Instance.DisplayMessage("Got Shard");
@@ -226,8 +229,8 @@ namespace Integration
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 1000f);
                         break;
                     default:
-                        UnityMainThreadDispatcher.Instance().logError("Item :" + itemName + " has no handling");
-                        ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Item {itemName} has no handling.\nPlease screenshot this error and send it to the developer of this mod so it can be fixed.", isDebug:false, duration:15f);
+                        UnityMainThreadDispatcher.Instance().logError("Item '" + itemName + "' has no handling");
+                        ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Item '{itemName}' has no handling.\nPlease screenshot this error and send it to the developer of this mod so it can be fixed.", isDebug:false, duration:20f);
                         break;
                 }
             }

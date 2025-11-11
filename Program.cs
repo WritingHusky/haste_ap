@@ -886,17 +886,17 @@ public class ApLogLocation : EnumSetting<APLogLocation>, IExposedSetting
         ApDebugLog.Instance.windowPosition = Value;
         ApDebugLog.Instance.RecalculatePosition();
     }
-    protected override APLogLocation GetDefaultValue() => APLogLocation.TopRight;
+    protected override APLogLocation GetDefaultValue() => APLogLocation.TopLeft;
     public LocalizedString GetDisplayName() => new UnlocalizedString("Text Client Location");
     public string GetCategory() => "AP Log";
 
     public override List<LocalizedString> GetLocalizedChoices() => [
-        new UnlocalizedString("Top Right"), 
-        new UnlocalizedString("Middle Right"), 
-        new UnlocalizedString("Bottom Right"), 
-        new UnlocalizedString("Top Left"),
-        new UnlocalizedString("Middle Left"),
-        new UnlocalizedString("Bottom Left"),
+        new UnlocalizedString("Top Left"), 
+        new UnlocalizedString("Middle Left"), 
+        new UnlocalizedString("Bottom Left"), 
+        new UnlocalizedString("Top Right"),
+        new UnlocalizedString("Middle Right"),
+        new UnlocalizedString("Bottom Right"),
         new UnlocalizedString("Custom"),
         ];
 
