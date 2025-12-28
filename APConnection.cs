@@ -86,7 +86,7 @@ public class Connection(string hostname, int port)
             if (modVersion.CompareTo(apVersion) > 0)
             {
                 // mod is newer than AP
-                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>WARNING:</color> Mod version {modVersion} is newer than APworld version {apVersion}.\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the smoothest experience.", isDebug:false);
+                ApDebugLog.Instance.DisplayMessage($"<color=#FFFF00>WARNING:</color> Mod version {modVersion} is newer than APworld version {apVersion}.\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the smoothest experience.", isDebug:false);
             }
 
             string[] subs = VersionNum.ToString().Split('.');
@@ -100,6 +100,7 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APVersionMajor"), Convert.ToSingle(0));
             FactSystem.SetFact(new Fact("APVersionMiddle"), Convert.ToSingle(2));
             FactSystem.SetFact(new Fact("APVersionMinor"), Convert.ToSingle(0));
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Your APworld is so out of date that it doesn't even have a version number, and almost certainly will not work properly with this mod (v{modVersion}).\nPlease update your APworld as soon as possible to ensure your seed will function correctly.", isDebug: false);
         }
 
         if (loginSuccess.SlotData.TryGetValue("ForceReload", out object ForceReload))

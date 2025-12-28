@@ -357,7 +357,7 @@ public partial class Program
             {
                 FactSystem.AddToFact(new Fact("APFragmentsanity" + FragKeyword), 1f);
                 ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword))}/{FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword))) + 1}", isDebug: false);
-                if (FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword)) == FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword)))
+                if (FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword)) >= FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword)))
                 {
                     connection.SendLocation(locationName + (Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword))) + 1).ToString("D2"));
                     FactSystem.AddToFact(new Fact("APFragmentsanityLocation" + FragKeyword), 1f);
@@ -372,23 +372,29 @@ public partial class Program
 
     public static void SetFragmentLimits(string keyword)
     {
-        if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
+        if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) == 2f)
         {
             // if MODE H-TRI
             // LIMIT = floor(FRAGMENTLOCATION / 2)
             FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), Math.Max((float)Math.Floor((FactSystem.GetFact(new Fact($"APFragmentsanityLocation{keyword}")) + 1) / 2), 1f));
         }
-        else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 3f)
+        else if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) == 3f)
         {
             // if MODE BALANCED HALF-TRI
             // LIMIT = min( floor(FRAGMENTLOCATION / 2), 10
             FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), Math.Max(Math.Min((float)Math.Floor((FactSystem.GetFact(new Fact($"APFragmentsanityLocation{keyword}")) + 1) / 2), 10f), 1f));
         }
-        else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 4f)
+        else if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) == 4f)
         {
             // if MODE TRI
             // LIMIT = FRAGMENTLOCATION
             FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), FactSystem.GetFact(new Fact($"APFragmentsanityLocation{keyword}")) + 1);
+        }
+
+        // failsafe
+        if (FactSystem.GetFact(new Fact($"APFragmentLimit{keyword}")) == 0f)
+        {
+            FactSystem.SetFact(new Fact($"APFragmentLimit{keyword}"), 1f);
         }
     }
 
