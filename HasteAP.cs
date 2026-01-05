@@ -1,23 +1,31 @@
 using APConnection;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
+using Archipelago.MultiClient.Net.Enums;
+using IL.JetBrains.Annotations;
 using Landfall.Haste;
 using Landfall.Modding;
+using System.ComponentModel.Design;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Interactions;
 using UnityEngine.Localization;
+using Zorro.Core;
+using Zorro.Core.CLI;
 using Zorro.Settings;
 using static Integration.Integration;
 
 [LandfallPlugin]
-public partial class Program
+public partial class HasteAP
 {
     private static Connection? connection;
 
-    private static readonly Version version = new(0, 3, 2);
+    private static readonly Version version = new(0, 4, 0);
 
-    static Program()
+    static HasteAP()
     {
         UnityMainThreadDispatcher.Instance().log("AP Program launched");
 
@@ -27,23 +35,28 @@ public partial class Program
         ApDebugLog.Instance.BuildFont();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage($"Archiplego Installed v{version}", isDebug: false);
+        ApDebugLog.Instance.DisplayMessage($"Archipelago Installed v{version}", isDebug: false);
 
-        // Load everything up when the games starts from menu
+        // Load everything up when the game starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
         On.GameHandler.LoadMainMenu += StaticLoadMainMenuHook;
 
     }
-
+    
     private static void StaticPlayFromMenuHook(On.GameHandler.orig_PlayFromMenu orig)
     {
 
 
         if (connection != null)
         {
-            UnityMainThreadDispatcher.Instance().logError("AP Play button clicked and connection is not null");
+            UnityMainThreadDispatcher.Instance().logError("AP Play button clicked and connection is not null, nuking everything anyway");
+            ClearHooks();
+            connection.Close();
+            connection = null;
+            ApDebugLog.Instance.DisplayMessage("Removed connection");
+            FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         }
-        ApDebugLog.Instance.DisplayMessage("Begining Build");
+        ApDebugLog.Instance.DisplayMessage("Beginning Build");
 
         var settingsHandler = GameHandler.Instance.SettingsHandler;
         var enabledSetting = settingsHandler.GetSetting<ApEnabledSetting>().Value;
@@ -58,7 +71,15 @@ public partial class Program
             return;
         }
 
-        UnityMainThreadDispatcher.Instance().log("AP enabled so begining startup");
+
+        if (FactSystem.GetFact(new Fact("APFirstLoad")) != FactSystem.GetFact(new Fact("tutorial_finished")))
+        {
+            UnityMainThreadDispatcher.Instance().log("AP save check mismatched. Likely a vanilla save. Aborting.");
+            ApDebugLog.Instance.DisplayMessage("<color=#FF0000>Non-Archipelago savefile detected.</color>\nThis mod relies on changing many vanilla savedata behaviours and therefore cannot be played on a normal save. Please switch to a fresh savefile or a save that already has AP data.\nIf you believe this is in error, please contact the developer of this mod.", isDebug: false, duration: 10f);
+            return;
+        }
+
+        UnityMainThreadDispatcher.Instance().log("AP enabled so beginning startup");
         var serverName = settingsHandler.GetSetting<ApServerNameSetting>().Value;
         var serverPort = settingsHandler.GetSetting<ApServerPortSetting>().Value;
         var username = settingsHandler.GetSetting<ApUsernameSetting>().Value;
@@ -80,9 +101,31 @@ public partial class Program
             ApDebugLog.Instance.DisplayMessage("Connection Failed");
             return;
         }
+        if (FactSystem.GetFact(new Fact("APVersionMiddle")) >= 3f)
+        {
+            // takes only the first 8 chars for the seed because floats only store so much and surely this is enough to stop conflicts
+            float seedpart = Convert.ToSingle(connection.session.RoomState.Seed[..8]);
+            if (FactSystem.GetFact(new Fact("APFirstLoad")) > 0f)
+            {
+                // compare
+                if (FactSystem.GetFact(new Fact("APRoomSeed")) != seedpart)
+                {
+                    ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The seed of the Archipelago room does not match the seed stored in the save data.\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f);
+                    connection.Close();
+                    connection = null;
+                    return;
+                }
+            } else
+            {
+                // set
+                FactSystem.SetFact(new Fact("APRoomSeed"), seedpart);
+            }
+
+        }
         ApDebugLog.Instance.DisplayMessage("Connected");
 
         Integration.Integration.connection = connection;
+
 
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         SetHubState();
@@ -127,25 +170,34 @@ public partial class Program
         // Override the handling of completing of a run to 
         On.GM_API.OnRunEnd += StaticCompleteRunHook;
         On.GM_API.OnPlayerEnteredPortal += StaticFragmentComplete;
+        On.GM_API.OnStartNewRun += StaticStartofRunHook;
+        On.RunHandler.PlayLevel += StaticStartOfFragmentHook;
+        On.Player.Die += StaticRemoveTrapsOnDeath;
+        On.PlayerCharacter.AddEnergy += StaticOnEnergyGain;
 
         On.GM_API.OnEndBossWin += StaticEndBossHook;
+        On.EndBoss.GoToMainMenu += StaticEndBossForceDC;
 
         // When a boss is defeated send the location
         On.GM_API.OnBossDeath += StaticBossDeathHook;
 
         On.ShopItemHandler.BuyItem += StaticBuyItemHook;
+        On.ShopItemHandler.DoClientBuyingItem += StaticBuyingItemFixHook;
         On.ShopItemHandler.GenerateItems += StaticGenerateItemHook;
 
         On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin += StaticPurchaseSkinHook;
         On.Landfall.Haste.SkinPurchasePopup.OpenPopup += StaticPurchaseSkinOpenHook;
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins += StaticDefaultUnlockedSkinsHook;
         On.Landfall.Haste.SkinManager.SetFullOutfit += StaticSetFullOutfitHook;
+        On.Landfall.Haste.SkinManager.HubWorldUnlockSkins += StaticHubWorldUnlockHook;
 
         On.SaveSystem.Load += StaticSaveLoadHook;
 
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked += StaticMetaProgressionRowAddClickedHook;
         On.Landfall.Haste.MetaProgressionRowUI.RefreshUI += StaticMetaProgressionRefreshUIHook;
         On.Landfall.Haste.MetaProgression.GetCurrentLevel += StaticMetaProgressionGetCurrentLevelHook;
+        On.Landfall.Haste.MetaProgression.IsUnlocked += StaticMetaProgressionIsUnlockedHook;
+        On.Landfall.Haste.MetaProgression.Unlock += StaticMetaProgressionUnlockHook;
 
         On.Landfall.Haste.AbilityUnlockScreen.Unlock += StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start += StaticInteractableCharacterStartHook;
@@ -153,6 +205,7 @@ public partial class Program
 
         On.PlayerCharacter.RestartPlayer_Launch_Transform_float += StaticSetSpeed;
         On.PlayerCharacter.RestartPlayer_Still_Transform += StaticSetSpeed;
+        On.PlayerMovement.Land += StaticLandingHook;
 
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
@@ -173,14 +226,21 @@ public partial class Program
     {
         On.GM_API.OnRunEnd -= StaticCompleteRunHook;
         On.GM_API.OnPlayerEnteredPortal -= StaticFragmentComplete;
+        On.GM_API.OnStartNewRun -= StaticStartofRunHook;
+        On.RunHandler.PlayLevel -= StaticStartOfFragmentHook;
+        On.Player.Die -= StaticRemoveTrapsOnDeath;
+        On.PlayerCharacter.AddEnergy -= StaticOnEnergyGain;
         On.GM_API.OnEndBossWin -= StaticEndBossHook;
         On.GM_API.OnBossDeath -= StaticBossDeathHook;
+        On.EndBoss.GoToMainMenu -= StaticEndBossForceDC;
         On.ShopItemHandler.BuyItem -= StaticBuyItemHook;
+        On.ShopItemHandler.DoClientBuyingItem -= StaticBuyingItemFixHook;
         On.ShopItemHandler.GenerateItems -= StaticGenerateItemHook;
         On.Landfall.Haste.SkinPurchasePopup.PurchaseSkin -= StaticPurchaseSkinHook;
         On.Landfall.Haste.SkinPurchasePopup.OpenPopup -= StaticPurchaseSkinOpenHook;
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins -= StaticDefaultUnlockedSkinsHook;
         On.Landfall.Haste.SkinManager.SetFullOutfit -= StaticSetFullOutfitHook;
+        On.Landfall.Haste.SkinManager.HubWorldUnlockSkins -= StaticHubWorldUnlockHook;
         On.SaveSystem.Load -= StaticSaveLoadHook;
         On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
@@ -188,9 +248,12 @@ public partial class Program
         On.GM_API.OnSpawnedInHub -= StaticLoadHubHook;
         On.PlayerCharacter.RestartPlayer_Launch_Transform_float -= StaticSetSpeed;
         On.PlayerCharacter.RestartPlayer_Still_Transform -= StaticSetSpeed;
+        On.PlayerMovement.Land -= StaticLandingHook;
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked -= StaticMetaProgressionRowAddClickedHook;
         On.Landfall.Haste.MetaProgressionRowUI.RefreshUI -= StaticMetaProgressionRefreshUIHook;
         On.Landfall.Haste.MetaProgression.GetCurrentLevel -= StaticMetaProgressionGetCurrentLevelHook;
+        On.Landfall.Haste.MetaProgression.IsUnlocked -= StaticMetaProgressionIsUnlockedHook;
+        On.Landfall.Haste.MetaProgression.Unlock -= StaticMetaProgressionUnlockHook;
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
             On.Player.Die -= StaticSendDeathOnDie;
@@ -210,16 +273,59 @@ public partial class Program
             return;
 
         var shard_count = connection.GetItemCount("Progressive Shard");
+        // make sure to cap the current_unbeaten to the correct value so that the extra Prog Shards dont make a bug happen with an invalid state
+        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 9 : FactSystem.GetFact(new Fact("APShardGoal")) - 1f;
         // Never allow the value to be not what I want it to be
         if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
         {
             var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
             // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
-            if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), newvalue);
+            if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(newvalue, shard_cap));
         }
         else
         {
-            if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), shard_count);
+            if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(shard_count, shard_cap));
+        }
+    }
+
+
+    private static void StaticLandingHook(On.PlayerMovement.orig_Land orig, PlayerMovement self, object landing)
+    {
+        if (FactSystem.GetFact(new Fact("APLandingTrapActive")) >= 1f)
+        {
+            float difficultyLandingMod = Mathf.Lerp(-0.05f, 0f, GameDifficulty.currentDif.landingPresicion);
+            // thats right, more type relfection bs. thanks, landfall
+            float landingScore = (float)landing.GetType().GetField("landingScore").GetValue(landing);
+
+            if (landingScore >= difficultyLandingMod + 0.95f)
+            {
+                // downgrade perfect to good
+                UnityMainThreadDispatcher.Instance().log("Attempting landing correction to Good");
+                landing.GetType().GetField("landingScore").SetValue(landing, difficultyLandingMod + 0.95f);
+            } else if (landingScore >= difficultyLandingMod + 0.9f)
+            {
+                // downgrade good to ok
+                UnityMainThreadDispatcher.Instance().log("Attempting landing correction to Okay");
+                landing.GetType().GetField("landingScore").SetValue(landing, difficultyLandingMod + 0.9f);
+            } else
+            {
+                //downgrade ok to bad
+                UnityMainThreadDispatcher.Instance().log("Attempting landing correction to Bad");
+                landing.GetType().GetField("landingScore").SetValue(landing, difficultyLandingMod + 0.8f);
+            }
+        }
+        orig(self, landing);
+    }
+
+    private static void StaticOnEnergyGain(On.PlayerCharacter.orig_AddEnergy orig, PlayerCharacter self, float added, EffectSource source)
+    {
+        if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
+        {
+            // ideally, this just permanently sets the energy to 0 unless you have an ability
+            return;
+        } else
+        {
+            orig(self, added, source);
         }
     }
 
@@ -367,7 +473,179 @@ public partial class Program
             }
 
         }
+        DecrementTraps();
         orig(player);
+    }
+
+
+    private static void StaticRemoveTrapsOnDeath(On.Player.orig_Die orig, Player self)
+    {
+        DecrementTraps();
+        orig(self);
+    }
+
+
+    private static void StaticStartOfFragmentHook(On.RunHandler.orig_PlayLevel orig)
+    {
+        // eval
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 1f)
+        {
+            RemoveTrap(TrapsList.Disaster);
+        }
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f)
+        {
+            ActivateTrap(TrapsList.Disaster);
+            FactSystem.AddToFact(new Fact("APQueuedDisasterTraps"), -1f);
+        }
+
+
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 1f)
+        {
+            RemoveTrap(TrapsList.Disaster);
+        }
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f)
+        {
+            ActivateTrap(TrapsList.Disaster);
+            FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
+        }
+        orig();
+    }
+
+    private static void ActivateTrap(TrapsList traptype)
+    {
+        //TODO: decide if notification should appear here or when picked up
+        switch (traptype)
+        {
+            case TrapsList.Disaster:
+                // i betcha there'll be some dumb shit i'm gonna need to fix when I eventually add the disaster shards as goals
+                if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
+                {
+                    FactSystem.SetFact(new Fact("APDisasterTrapActive"), 1f);
+                    ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
+                    // why is the add and remove item functions privated you JERKS
+                    Type metaPlayer = typeof(Player);
+                    MethodInfo entryAddItem = metaPlayer.GetMethod("AddItem", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance)], null);
+                    entryAddItem.Invoke(Player.localPlayer, [DisasterItem]);
+                }
+                break;
+            case TrapsList.Landing:
+                if (FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
+                {
+                    FactSystem.SetFact(new Fact("APLandingTrapActive"), 1f);
+                }
+                break;
+            default:
+                break;
+        }
+    }
+
+    private static void DecrementTraps()
+    {
+        
+        if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) >= 1f)
+        {
+            FactSystem.AddToFact(new Fact("APDisasterTrapActive"), -1f);
+        }
+        if (FactSystem.GetFact(new Fact("APLandingTrapActive")) >= 1f)
+        {
+            FactSystem.AddToFact(new Fact("APLandingTrapActive"), -1f);
+        }
+    }
+
+    private static void RemoveTrap(TrapsList traptype)
+    {
+        switch (traptype)
+        {
+            case TrapsList.Disaster:
+                FactSystem.SetFact(new Fact("APDisasterTrapActive"), 0f);
+                ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
+                Type metaPlayer = typeof(Player);
+                MethodInfo entryRemoveItem = metaPlayer.GetMethod("RemoveItem", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance)], null);
+                entryRemoveItem.Invoke(Player.localPlayer, [DisasterItem]);
+                break;
+            case TrapsList.Landing:
+                FactSystem.SetFact(new Fact("APLandingTrapActive"), 0f);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private static void StaticStartofRunHook(On.GM_API.orig_OnStartNewRun orig)
+    {
+        // my base instincts tell me I should block these off if you dont have the setting enabled, but my third eye foresees someone having them as starting items regardless and asking why they dont work
+        GenerateRandomStartingItems(Rarity.Common, APItemCategory.Speed, FactSystem.GetFact(new Fact("APCommonSpeedItems")));
+        GenerateRandomStartingItems(Rarity.Common, APItemCategory.Support, FactSystem.GetFact(new Fact("APCommonSupportItems")));
+        GenerateRandomStartingItems(Rarity.Common, APItemCategory.Health, FactSystem.GetFact(new Fact("APCommonHealthItems")));
+        GenerateRandomStartingItems(Rarity.Rare, APItemCategory.Speed, FactSystem.GetFact(new Fact("APRareSpeedItems")));
+        GenerateRandomStartingItems(Rarity.Rare, APItemCategory.Support, FactSystem.GetFact(new Fact("APRareSupportItems")));
+        GenerateRandomStartingItems(Rarity.Rare, APItemCategory.Health, FactSystem.GetFact(new Fact("APRareHealthItems")));
+        GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Speed, FactSystem.GetFact(new Fact("APEpicSpeedItems")));
+        GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Support, FactSystem.GetFact(new Fact("APEpicSupportItems")));
+        GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Health, FactSystem.GetFact(new Fact("APEpicHealthItems")));
+        GenerateRandomStartingItems(Rarity.Legendary, APItemCategory.Legendary, FactSystem.GetFact(new Fact("APLegendaryItems")));
+        orig();
+    }
+
+    public static void GenerateRandomStartingItems(Rarity rarity, APItemCategory category, float q)
+    {
+        if (q == 0f) { return; }
+        List<ItemInstance> itemlist = [];
+        Type metaItemDB = typeof(ItemDatabase);
+        MethodInfo entryIIA = metaItemDB.GetMethod("ItemIsAcceptable", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance), typeof(TagInteraction), typeof(List<ItemTag>), typeof(GetRandomItemFlags), typeof(List<ItemInstance>)], null);
+        List<string> referenceTable = [];
+        switch (category)
+        {
+            case APItemCategory.Speed:
+                referenceTable = ItemCategories.ItemCategories.SpeedItems;
+                break;
+            case APItemCategory.Support:
+                referenceTable = ItemCategories.ItemCategories.SupportItems;
+                break;
+            case APItemCategory.Health:
+                referenceTable = ItemCategories.ItemCategories.HealthItems;
+                break;
+            default:
+                break;
+        }
+
+        foreach (ItemInstance ii in ItemDatabase.instance.items)
+        {
+            // legendary items dont have an exclusion table, and just get them all
+            if (category != APItemCategory.Legendary) {
+                if (!referenceTable.Contains(ii.itemName)) { continue; }
+            }
+            if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPermanentItems")) == 2f) { continue; }
+            if ((bool)entryIIA.Invoke(ItemDatabase.instance, [ii, TagInteraction.None, null, GetRandomItemFlags.Major, null]))
+            {
+                itemlist.Add(ii);
+            }
+        }
+
+        if (itemlist.Count == 0)
+        {
+            ApDebugLog.Instance.DisplayMessage($"<color=#FFFF00>WARNING:</color> Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item before run start due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false);
+            return;
+        }
+
+        // loop for q, select q items and add to player
+        System.Random random = new();
+        // if I had a dollar for every useful function locked behind type reflection, I could buy like 3 copies of the game
+        MethodInfo entrySIWR = metaItemDB.GetMethod("SelectItemWithRarity", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(List<ItemInstance>), typeof(Rarity), typeof(System.Random)], null);
+        Type metaPlayer = typeof(Player);
+        MethodInfo entryAddItem = metaPlayer.GetMethod("AddItem", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance)], null);
+        for (int i = 0; i < (int)q; i++)
+        {
+            ItemInstance newitem = (ItemInstance)entrySIWR.Invoke(ItemDatabase.instance, [itemlist, rarity, random]);
+            if (newitem != null)
+            {
+                FactSystem.SetFact(new Fact($"{newitem.itemName}_ShowItem"), 1f);
+                entryAddItem.Invoke(Player.localPlayer, [newitem]);
+            } else
+            {
+                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not generate {rarity} {category} item before run start for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false);
+            }
+        }
     }
 
     public static void SetFragmentLimits(string keyword)
@@ -523,8 +801,42 @@ public partial class Program
 
             connection.SendLocation(item_location);
         }
+
+        // manually calculating the index of the item selected so it doesnt buy a different item with the same name later in the buying process
+        Type metaShopItemHandler = typeof(ShopItemHandler);
+        FieldInfo entryItemInstances = metaShopItemHandler.GetField("itemInstances", BindingFlags.NonPublic | BindingFlags.Instance);
+        var ItemInstances = entryItemInstances.GetValue(self) as List<ItemInstance>;
+        FieldInfo entryItemVisuals = metaShopItemHandler.GetField("itemVisuals", BindingFlags.NonPublic | BindingFlags.Instance);
+        var ItemVisuals = entryItemVisuals.GetValue(self) as List<ShopItem>;
+        int selIndex = -1;
+        for (int i = 0; i < ItemInstances.Count; i++)
+        {
+            if ((bool)ItemInstances[i] && ItemInstances[i].itemName == item.itemName && ItemVisuals[i].CheckSelected())
+            {
+                selIndex = i;
+            }
+        }
+        FactSystem.SetFact(new Fact("APTempShopIndex"), (float)selIndex);
         // Buy the item
         orig(self, item, price);
+    }
+
+
+    private static bool StaticBuyingItemFixHook(On.ShopItemHandler.orig_DoClientBuyingItem orig, ShopItemHandler self, string itemName)
+    {
+        // duplication fix only matters for AP items
+        if (itemName == "ArchipelagoShopItem")
+        {
+            if (FactSystem.GetFact(new Fact("APTempShopIndex")) == -1f){ return false; }
+            Type metaShopItemHandler = typeof(ShopItemHandler);
+            MethodInfo entryUnset = metaShopItemHandler.GetMethod("Unset", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(int)], null);
+            entryUnset.Invoke(self, [(int)(FactSystem.GetFact(new Fact("APTempShopIndex")))]);
+            FactSystem.SetFact(new Fact("APTempShopIndex"), 0f);
+            return true;
+        } else
+        {
+            return orig(self, itemName);
+        }
     }
 
 
@@ -575,6 +887,19 @@ public partial class Program
             connection.SendLocation("Shard 10 Boss");
         }
         orig();
+    }
+
+    private static void StaticEndBossForceDC(On.EndBoss.orig_GoToMainMenu orig, EndBoss self)
+    {
+        if (connection != null)
+        {
+            ClearHooks();
+            connection.Close();
+            connection = null;
+            ApDebugLog.Instance.DisplayMessage("Removed connection");
+            FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
+        }
+        orig(self);
     }
 
     private static void StaticMetaProgressionUnlockOverloadHook(On.Landfall.Haste.AbilityUnlockScreen.orig_Unlock orig, AbilityUnlockScreen self)
@@ -694,6 +1019,57 @@ public partial class Program
 
     }
 
+    private static bool StaticMetaProgressionIsUnlockedHook(On.Landfall.Haste.MetaProgression.orig_IsUnlocked orig, AbilityKind abilityKind)
+    {
+        if (abilityKind == AbilityKind.BoardBoost)
+        {
+            return FactSystem.GetFact(new Fact("APBoostUnlocked")) > 0f;
+        }
+        return orig(abilityKind);
+    }
+
+    private static void StaticMetaProgressionUnlockHook(On.Landfall.Haste.MetaProgression.orig_Unlock orig, AbilityKind abilityKind)
+    {
+        FactSystem.SetFact(new Fact("APNoAbility"), 0f);
+        switch (abilityKind)
+        {
+            case AbilityKind.BoardBoost:
+                FactSystem.SetFact(new Fact("APBoostUnlocked"), 1f);
+                break;
+            case AbilityKind.Slomo:
+                FactSystem.SetFact(MetaProgression.SlomoUnlocked, 1f);
+                break;
+            case AbilityKind.Grapple:
+                FactSystem.SetFact(MetaProgression.GrappleUnlocked, 1f);
+                break;
+            case AbilityKind.Fly:
+                FactSystem.SetFact(MetaProgression.FlyUnlocked, 1f);
+                break;
+            default:
+                throw new ArgumentOutOfRangeException("abilityKind", abilityKind, null);
+        }
+        if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
+        {
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, true);
+        }
+    }
+
+    private static void StaticHubWorldUnlockHook(On.Landfall.Haste.SkinManager.orig_HubWorldUnlockSkins orig)
+    {
+        SkinManager.CompleteRunUnlockSkins((int)FactSystem.GetFact(new Fact("current_unbeaten_shard")) - 1);
+        if (FactSystem.GetFact(new Fact("Has_Won_Game")) > 0f)
+        {
+            SkinManager.UnlockSkin(SkinManager.Skin.Crispy, true);
+        }
+        if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
+        {
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, true);
+        }
+        if (FactSystem.GetFact(new Fact("Current_UnlockedAscensionLevel")) >= 2f)
+        {
+            SkinManager.UnlockSkin(SkinManager.Skin.DarkClown, true);
+        }
+    }
 
     private static void StaticMetaProgressionRefreshUIHook(On.Landfall.Haste.MetaProgressionRowUI.orig_RefreshUI orig, MetaProgressionRowUI self)
     {
@@ -820,9 +1196,59 @@ public partial class Program
         }
         orig(self);
     }
+
+
+
+    [ConsoleCommand]
+    public static void ResetFragmentsanity(int shard = 0)
+    {
+        if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f){
+            //reset globals
+            if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitGlobal"), 1f); }
+            FactSystem.SetFact(new Fact($"APFragmentsanityGlobal"), 0f);
+        } else
+        {
+            if (shard < 0 || shard > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
+            // only reset limit for non-linear dist
+            if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitShard{shard}"), 1f); }
+            FactSystem.SetFact(new Fact($"APFragmentsanityShard{shard}"), 0f);
+        }
+    }
+
+    [ConsoleCommand]
+    public static void ResetShopsanity(int shard = 0)
+    {
+        if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
+        {
+            //reset globals
+            FactSystem.SetFact(new Fact($"APShopsanityGlobal"), 0f);
+        }
+        else
+        {
+            if (shard < 0 || shard > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
+            FactSystem.SetFact(new Fact($"APShopsanityShard{shard}"), 0f);
+        }
+    }
+
+    //[ConsoleCommand]
+    //public static void DumpItemData()
+    //{
+    //    string thedump = "";
+    //    foreach (ItemInstance item in ItemDatabase.instance.items)
+    //    {
+    //        thedump += $"{item.title.GetLocalizedString()}, {item.itemName}, {item.triggerType}\n";
+    //    }
+    //    // dumps into haste directory on steam
+    //    File.WriteAllText("hastedump.txt", thedump);
+    //}
+
+    // will delete later
+    [ConsoleCommand]
+    public static void SendBuggedLocation(string loc)
+    {
+        connection.SendLocation(loc);
+    }
 }
-
-
 
 // Settings For AP server connection
 [HasteSetting]
@@ -976,8 +1402,8 @@ public class ApLogTestMessage : ButtonSetting, IExposedSetting
 public class ApServerNameSetting : StringSetting, IExposedSetting
 {
     public override void ApplyValue() => UnityMainThreadDispatcher.Instance().log($"New AP hostname {Value}");
-    protected override string GetDefaultValue() => "localhost";
-    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Server name");
+    protected override string GetDefaultValue() => "archipelago.gg";
+    public LocalizedString GetDisplayName() => new UnlocalizedString("AP Server Name");
     public string GetCategory() => "AP";
 }
 

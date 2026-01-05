@@ -21,7 +21,7 @@ public class Connection(string hostname, int port)
 
     public DeathLinkService? deathLinkService;
 
-    public bool Connect(string user = "Player1", string? pass = null, Version modVersion = null)
+    public bool Connect(string user = "Player1", string? pass = null, Version? modVersion = null)
     {
         username = user;
         LoginResult result;
@@ -97,9 +97,9 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get Version from slot data:" + loginSuccess.SlotData.toJson());
-            FactSystem.SetFact(new Fact("APVersionMajor"), Convert.ToSingle(0));
-            FactSystem.SetFact(new Fact("APVersionMiddle"), Convert.ToSingle(2));
-            FactSystem.SetFact(new Fact("APVersionMinor"), Convert.ToSingle(0));
+            FactSystem.SetFact(new Fact("APVersionMajor"), 0f);
+            FactSystem.SetFact(new Fact("APVersionMiddle"), 2f);
+            FactSystem.SetFact(new Fact("APVersionMinor"), 0f);
             ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Your APworld is so out of date that it doesn't even have a version number, and almost certainly will not work properly with this mod (v{modVersion}).\nPlease update your APworld as soon as possible to ensure your seed will function correctly.", isDebug: false);
         }
 
@@ -111,7 +111,6 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get ForceReaload from slot data:" + loginSuccess.SlotData.toJson());
-            // Might default the value here to make things consistant
         }
 
         if (loginSuccess.SlotData.TryGetValue("Shard Unlock Order", out object ShardUnlockOrder))
@@ -123,6 +122,16 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShardUnlockOrder from slot data:" + loginSuccess.SlotData.toJson());
             FactSystem.SetFact(new Fact("APShardUnlockOrder"), 0f);
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("Remove Post-Victory Locaitons", out object RemovePVL))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found RemovePVL in slot data with value: {RemovePVL}");
+            FactSystem.SetFact(new Fact("APRemovePVL"), Convert.ToSingle(RemovePVL));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get RemovePVL from slot data:" + loginSuccess.SlotData.toJson());
         }
 
         if (loginSuccess.SlotData.TryGetValue("Shopsanity", out object Shopsanity))
@@ -279,10 +288,6 @@ public class Connection(string hostname, int port)
 
             UnityMainThreadDispatcher.Instance().log($"AP found SpeedUpgrades in slot data with value: {SpeedUpgrades}");
             FactSystem.SetFact(new Fact("APSpeedUpgrades"), Convert.ToSingle(SpeedUpgrades));
-            if (FactSystem.GetFact(new Fact("APSpeedUpgrades")) == 1f)
-            {
-                if (FactSystem.GetFact(new Fact("APSpeedUpgradesCollected")) == 0f) FactSystem.SetFact(new Fact("APSpeedUpgradesCollected"), 0f);
-            }
         }
         else
         {
@@ -325,6 +330,54 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get FashionPurchases from slot data:" + loginSuccess.SlotData.toJson());
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("Starting Ability", out object StartingAbility))
+        {
+
+            UnityMainThreadDispatcher.Instance().log($"AP found StartingAbility in slot data with value: {StartingAbility}");
+            if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+            {
+                if (Convert.ToSingle(StartingAbility) == 0f){
+                    FactSystem.SetFact(new Fact("APNoAbility"), 1f);
+                } else
+                {
+                    FactSystem.SetFact(new Fact("active_ability"), Convert.ToSingle(StartingAbility) - 1f);
+                    switch (Convert.ToSingle(StartingAbility))
+                    {
+                        case 1f:
+                            MetaProgression.Unlock(AbilityKind.BoardBoost);
+                            break;
+                        case 2f:
+                            MetaProgression.Unlock(AbilityKind.Slomo);
+                            break;
+                        case 3f:
+                            MetaProgression.Unlock(AbilityKind.Grapple);
+                            break;
+                        case 4f:
+                            MetaProgression.Unlock(AbilityKind.Fly);
+                            break;
+                        default:
+                            break;
+
+                    }
+                }
+            }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get StartingAbility from slot data:" + loginSuccess.SlotData.toJson());
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("Permanent Items", out object PermItems))
+        {
+
+            UnityMainThreadDispatcher.Instance().log($"AP found PermItems in slot data with value: {PermItems}");
+            FactSystem.SetFact(new Fact("APPermanentItems"), Convert.ToSingle(PermItems));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get PermItems from slot data:" + loginSuccess.SlotData.toJson());
         }
 
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))

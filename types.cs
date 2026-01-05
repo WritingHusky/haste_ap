@@ -49,3 +49,17 @@ public enum APLogLocation
     BottomRight,
     Custom
 }
+
+public enum APItemCategory
+{
+    Speed,
+    Support,
+    Health,
+    Legendary // only used for error output
+}
+
+public enum TrapsList
+{
+    Disaster,
+    Landing
+}
