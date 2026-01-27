@@ -4,11 +4,13 @@ using Archipelago.MultiClient.Net.Enums;
 using IL.JetBrains.Annotations;
 using Landfall.Haste;
 using Landfall.Modding;
+using MonoMod.Core.Platforms;
 using System.ComponentModel.Design;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using TMPro;
+using Unity.Properties;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Interactions;
@@ -16,6 +18,7 @@ using UnityEngine.Localization;
 using Zorro.Core;
 using Zorro.Core.CLI;
 using Zorro.Settings;
+using static HelperFunctions;
 using static Integration.Integration;
 
 [LandfallPlugin]
@@ -75,7 +78,7 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APFirstLoad")) != FactSystem.GetFact(new Fact("tutorial_finished")))
         {
             UnityMainThreadDispatcher.Instance().log("AP save check mismatched. Likely a vanilla save. Aborting.");
-            ApDebugLog.Instance.DisplayMessage("<color=#FF0000>Non-Archipelago savefile detected.</color>\nThis mod relies on changing many vanilla savedata behaviours and therefore cannot be played on a normal save. Please switch to a fresh savefile or a save that already has AP data.\nIf you believe this is in error, please contact the developer of this mod.", isDebug: false, duration: 10f);
+            ApDebugLog.Instance.DisplayMessage("<color=#FF0000>Non-Archipelago savefile detected.</color>\nThis mod relies on changing many vanilla savedata behaviours and therefore cannot be played on a normal save. Please switch to a fresh savefile (from the 'General' settings menu) or a save that already has AP data.\nIf you believe this is in error, please contact the developer of this mod.", isDebug: false, duration: 10f);
             return;
         }
 
@@ -174,6 +177,7 @@ public partial class HasteAP
         On.RunHandler.PlayLevel += StaticStartOfFragmentHook;
         On.Player.Die += StaticRemoveTrapsOnDeath;
         On.PlayerCharacter.AddEnergy += StaticOnEnergyGain;
+        On.Player.SetEnergy += StaticOnSetEnergy;
 
         On.GM_API.OnEndBossWin += StaticEndBossHook;
         On.EndBoss.GoToMainMenu += StaticEndBossForceDC;
@@ -191,7 +195,7 @@ public partial class HasteAP
         On.Landfall.Haste.SkinManager.SetFullOutfit += StaticSetFullOutfitHook;
         On.Landfall.Haste.SkinManager.HubWorldUnlockSkins += StaticHubWorldUnlockHook;
 
-        On.SaveSystem.Load += StaticSaveLoadHook;
+        //On.SaveSystem.Load += StaticSaveLoadHook;
 
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked += StaticMetaProgressionRowAddClickedHook;
         On.Landfall.Haste.MetaProgressionRowUI.RefreshUI += StaticMetaProgressionRefreshUIHook;
@@ -230,6 +234,7 @@ public partial class HasteAP
         On.RunHandler.PlayLevel -= StaticStartOfFragmentHook;
         On.Player.Die -= StaticRemoveTrapsOnDeath;
         On.PlayerCharacter.AddEnergy -= StaticOnEnergyGain;
+        On.Player.SetEnergy -= StaticOnSetEnergy;
         On.GM_API.OnEndBossWin -= StaticEndBossHook;
         On.GM_API.OnBossDeath -= StaticBossDeathHook;
         On.EndBoss.GoToMainMenu -= StaticEndBossForceDC;
@@ -241,7 +246,7 @@ public partial class HasteAP
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins -= StaticDefaultUnlockedSkinsHook;
         On.Landfall.Haste.SkinManager.SetFullOutfit -= StaticSetFullOutfitHook;
         On.Landfall.Haste.SkinManager.HubWorldUnlockSkins -= StaticHubWorldUnlockHook;
-        On.SaveSystem.Load -= StaticSaveLoadHook;
+        //On.SaveSystem.Load -= StaticSaveLoadHook;
         On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
         On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
@@ -279,7 +284,7 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
         {
             var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
-            // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
+            // if unlock-order is Boss-locked, then only unlock up until the lowest of either bossbeated or shards
             if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(newvalue, shard_cap));
         }
         else
@@ -291,27 +296,26 @@ public partial class HasteAP
 
     private static void StaticLandingHook(On.PlayerMovement.orig_Land orig, PlayerMovement self, object landing)
     {
-        if (FactSystem.GetFact(new Fact("APLandingTrapActive")) >= 1f)
+        if (FactSystem.GetFact(new Fact("APLandingTrapIsActive")) >= 1f)
         {
+            PlayerMovement.Landing? ll = landing as PlayerMovement.Landing;
             float difficultyLandingMod = Mathf.Lerp(-0.05f, 0f, GameDifficulty.currentDif.landingPresicion);
-            // thats right, more type relfection bs. thanks, landfall
-            float landingScore = (float)landing.GetType().GetField("landingScore").GetValue(landing);
 
-            if (landingScore >= difficultyLandingMod + 0.95f)
+            if (ll.landingScore >= difficultyLandingMod + 0.95f)
             {
                 // downgrade perfect to good
                 UnityMainThreadDispatcher.Instance().log("Attempting landing correction to Good");
-                landing.GetType().GetField("landingScore").SetValue(landing, difficultyLandingMod + 0.95f);
-            } else if (landingScore >= difficultyLandingMod + 0.9f)
+                ll.landingScore =  difficultyLandingMod + 0.94f;
+            } else if (ll.landingScore >= difficultyLandingMod + 0.9f)
             {
                 // downgrade good to ok
                 UnityMainThreadDispatcher.Instance().log("Attempting landing correction to Okay");
-                landing.GetType().GetField("landingScore").SetValue(landing, difficultyLandingMod + 0.9f);
+                ll.landingScore =  difficultyLandingMod + 0.89f;
             } else
             {
                 //downgrade ok to bad
                 UnityMainThreadDispatcher.Instance().log("Attempting landing correction to Bad");
-                landing.GetType().GetField("landingScore").SetValue(landing, difficultyLandingMod + 0.8f);
+                ll.landingScore =  difficultyLandingMod + 0.79f;
             }
         }
         orig(self, landing);
@@ -321,13 +325,25 @@ public partial class HasteAP
     {
         if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
         {
-            // ideally, this just permanently sets the energy to 0 unless you have an ability
-            return;
+            // ideally, these just permanently keep the energy at 0 unless you have an ability
         } else
         {
             orig(self, added, source);
         }
     }
+
+    private static void StaticOnSetEnergy(On.Player.orig_SetEnergy orig, Player self, float amount)
+    {
+        if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
+        {
+            // ideally, these just permanently keep the energy at 0 unless you have an ability
+        }
+        else
+        {
+            orig(self, amount);
+        }
+    }
+
 
     private static void StaticSetSpeed(On.PlayerCharacter.orig_RestartPlayer_Still_Transform orig, PlayerCharacter self, Transform spawnPoint)
     {
@@ -444,6 +460,7 @@ public partial class HasteAP
             return;
         }
         // make sure youre actually in a fragment, not a rest/shop/challenge
+        // TODO: find better way to handle this because RunHandler isnt reliable in the post-fragment
         if (FactSystem.GetFact(new Fact("APFragmentsanity")) > 0f && RunHandler.IsInLevelOrChallenge())
         {
             string? locationName; // location to send
@@ -453,7 +470,8 @@ public partial class HasteAP
                 var currentShard = RunHandler.RunData.shardID + 1;
                 locationName = $"Shard {currentShard} Fragment Clear ";
                 FragKeyword = "Shard" + currentShard;
-            } else
+            }
+            else
             {
                 locationName = "Global Fragment Clear ";
                 FragKeyword = "Global";
@@ -462,6 +480,12 @@ public partial class HasteAP
             if (FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword)) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity")))
             {
                 FactSystem.AddToFact(new Fact("APFragmentsanity" + FragKeyword), 1f);
+                // bonus point for S-Rank
+                //ApDebugLog.Instance.DisplayMessage($"Fragment cleared with rank {RunHandler.currentTier}");
+                //if (FactSystem.GetFact(new Fact("APSRankBonus")) == 1f && RunHandler.currentTier == 0)
+                //{
+                //    FactSystem.AddToFact(new Fact("APFragmentsanity" + FragKeyword), 1f);
+                //}
                 ApDebugLog.Instance.DisplayMessage($"Completed Fragment. Progress: {FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword))}/{FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword))} for Clear {Convert.ToInt32(FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword))) + 1}", isDebug: false);
                 if (FactSystem.GetFact(new Fact("APFragmentsanity" + FragKeyword)) >= FactSystem.GetFact(new Fact("APFragmentLimit" + FragKeyword)))
                 {
@@ -488,24 +512,30 @@ public partial class HasteAP
     private static void StaticStartOfFragmentHook(On.RunHandler.orig_PlayLevel orig)
     {
         // eval
-        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 1f)
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
         {
             RemoveTrap(TrapsList.Disaster);
         }
-        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f)
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
         {
             ActivateTrap(TrapsList.Disaster);
+        }
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f)
+        {
             FactSystem.AddToFact(new Fact("APQueuedDisasterTraps"), -1f);
         }
 
 
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 1f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
         {
-            RemoveTrap(TrapsList.Disaster);
+            RemoveTrap(TrapsList.Landing);
+        }
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
+        {
+            ActivateTrap(TrapsList.Landing);
         }
         if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f)
         {
-            ActivateTrap(TrapsList.Disaster);
             FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
         }
         orig();
@@ -513,7 +543,6 @@ public partial class HasteAP
 
     private static void ActivateTrap(TrapsList traptype)
     {
-        //TODO: decide if notification should appear here or when picked up
         switch (traptype)
         {
             case TrapsList.Disaster:
@@ -521,17 +550,16 @@ public partial class HasteAP
                 if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
                 {
                     FactSystem.SetFact(new Fact("APDisasterTrapActive"), 1f);
+                    FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 1f);
                     ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
-                    // why is the add and remove item functions privated you JERKS
-                    Type metaPlayer = typeof(Player);
-                    MethodInfo entryAddItem = metaPlayer.GetMethod("AddItem", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance)], null);
-                    entryAddItem.Invoke(Player.localPlayer, [DisasterItem]);
+                    Player.localPlayer.AddItem(DisasterItem);
                 }
                 break;
             case TrapsList.Landing:
                 if (FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
                 {
                     FactSystem.SetFact(new Fact("APLandingTrapActive"), 1f);
+                    FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 1f);
                 }
                 break;
             default:
@@ -557,14 +585,12 @@ public partial class HasteAP
         switch (traptype)
         {
             case TrapsList.Disaster:
-                FactSystem.SetFact(new Fact("APDisasterTrapActive"), 0f);
+                FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 0f);
                 ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
-                Type metaPlayer = typeof(Player);
-                MethodInfo entryRemoveItem = metaPlayer.GetMethod("RemoveItem", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance)], null);
-                entryRemoveItem.Invoke(Player.localPlayer, [DisasterItem]);
+                Player.localPlayer.RemoveItem(DisasterItem);
                 break;
             case TrapsList.Landing:
-                FactSystem.SetFact(new Fact("APLandingTrapActive"), 0f);
+                FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 0f);
                 break;
             default:
                 break;
@@ -591,8 +617,6 @@ public partial class HasteAP
     {
         if (q == 0f) { return; }
         List<ItemInstance> itemlist = [];
-        Type metaItemDB = typeof(ItemDatabase);
-        MethodInfo entryIIA = metaItemDB.GetMethod("ItemIsAcceptable", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance), typeof(TagInteraction), typeof(List<ItemTag>), typeof(GetRandomItemFlags), typeof(List<ItemInstance>)], null);
         List<string> referenceTable = [];
         switch (category)
         {
@@ -615,8 +639,8 @@ public partial class HasteAP
             if (category != APItemCategory.Legendary) {
                 if (!referenceTable.Contains(ii.itemName)) { continue; }
             }
-            if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPermanentItems")) == 2f) { continue; }
-            if ((bool)entryIIA.Invoke(ItemDatabase.instance, [ii, TagInteraction.None, null, GetRandomItemFlags.Major, null]))
+            if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPersistentItems")) == 2f) { continue; }
+            if (ItemDatabase.ItemIsAcceptable(ii, TagInteraction.None, null, GetRandomItemFlags.Major, null))
             {
                 itemlist.Add(ii);
             }
@@ -630,17 +654,13 @@ public partial class HasteAP
 
         // loop for q, select q items and add to player
         System.Random random = new();
-        // if I had a dollar for every useful function locked behind type reflection, I could buy like 3 copies of the game
-        MethodInfo entrySIWR = metaItemDB.GetMethod("SelectItemWithRarity", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(List<ItemInstance>), typeof(Rarity), typeof(System.Random)], null);
-        Type metaPlayer = typeof(Player);
-        MethodInfo entryAddItem = metaPlayer.GetMethod("AddItem", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(ItemInstance)], null);
         for (int i = 0; i < (int)q; i++)
         {
-            ItemInstance newitem = (ItemInstance)entrySIWR.Invoke(ItemDatabase.instance, [itemlist, rarity, random]);
+            ItemInstance newitem = ItemDatabase.SelectItemWithRarity(itemlist, rarity, random);
             if (newitem != null)
             {
                 FactSystem.SetFact(new Fact($"{newitem.itemName}_ShowItem"), 1f);
-                entryAddItem.Invoke(Player.localPlayer, [newitem]);
+                Player.localPlayer.AddItem(newitem);
             } else
             {
                 ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not generate {rarity} {category} item before run start for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false);
@@ -681,37 +701,23 @@ public partial class HasteAP
     {
         if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f)
         {
-
-            // more type reflection bs to get around private values being annoying 
-            Type metaShopItemHandler = typeof(ShopItemHandler);
-            FieldInfo entryRerolls = metaShopItemHandler.GetField("rerolls", BindingFlags.NonPublic | BindingFlags.Instance);
-            var rerolls = entryRerolls.GetValue(self) as int?;
-            FieldInfo entryItemInstances = metaShopItemHandler.GetField("itemInstances", BindingFlags.NonPublic | BindingFlags.Instance);
-            var ItemInstances = entryItemInstances.GetValue(self) as List<ItemInstance>;
-            FieldInfo entryItemVisuals = metaShopItemHandler.GetField("itemVisuals", BindingFlags.NonPublic | BindingFlags.Instance);
-            var ItemVisuals = entryItemVisuals.GetValue(self) as List<ShopItem>;
-            MethodInfo entryUnset = metaShopItemHandler.GetMethod("Unset", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(int)], null);
-
+            ApDebugLog.Instance.DisplayMessage($"Static Generate Item Hook");
             try
             {
-                if (rerolls == null) ApDebugLog.Instance.DisplayMessage($"rerolls detected null");
-                if (ItemInstances == null) ApDebugLog.Instance.DisplayMessage($"ItemInstances detected null");
-                if (ItemVisuals == null) ApDebugLog.Instance.DisplayMessage($"ItemVisuals detected null");
-                if (entryUnset == null) ApDebugLog.Instance.DisplayMessage($"entryUnset detected null");
                 Player localPlayer = Player.localPlayer;
-                System.Random currentLevelRandomInstance = RunHandler.GetCurrentLevelRandomInstance((int)rerolls);
+                System.Random currentLevelRandomInstance = RunHandler.GetCurrentLevelRandomInstance(self.rerolls);
                 List<ItemInstance> excludedList = new List<ItemInstance>();
-                foreach (ItemInstance itemInstance in ItemInstances)
+                foreach (ItemInstance itemInstance in self.itemInstances)
                 {
                     if (itemInstance)
                     {
                         excludedList.Add(itemInstance);
                     }
                 }
-                int num = Mathf.Max(ItemInstances.Count, ItemVisuals.Count);
+                int num = Mathf.Max(self.itemInstances.Count, self.itemVisuals.Count);
                 for (int i = 0; i < num; i++)
                 {
-                    entryUnset.Invoke(self, [i]);
+                    self.Unset(i);
                 }
 
                 for (int j = 0; j < 3; j++)
@@ -733,14 +739,14 @@ public partial class HasteAP
                     {
                         // normal items
                         if (itemInstance2.itemName != "ArchipelagoShopItem") excludedList.Add(itemInstance2);
-                        ItemInstances.Add(itemInstance2);
+                        self.itemInstances.Add(itemInstance2);
                     }
                 }
             }
             catch (Exception e)
             {
                 UnityMainThreadDispatcher.Instance().log($"Error in generating shop items {e.Message},{e.InnerException},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"Error in generating shop items {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
+                ApDebugLog.Instance.DisplayMessage($"Error in generating shop items:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
             }
 
             
@@ -803,15 +809,10 @@ public partial class HasteAP
         }
 
         // manually calculating the index of the item selected so it doesnt buy a different item with the same name later in the buying process
-        Type metaShopItemHandler = typeof(ShopItemHandler);
-        FieldInfo entryItemInstances = metaShopItemHandler.GetField("itemInstances", BindingFlags.NonPublic | BindingFlags.Instance);
-        var ItemInstances = entryItemInstances.GetValue(self) as List<ItemInstance>;
-        FieldInfo entryItemVisuals = metaShopItemHandler.GetField("itemVisuals", BindingFlags.NonPublic | BindingFlags.Instance);
-        var ItemVisuals = entryItemVisuals.GetValue(self) as List<ShopItem>;
         int selIndex = -1;
-        for (int i = 0; i < ItemInstances.Count; i++)
+        for (int i = 0; i < self.itemInstances.Count; i++)
         {
-            if ((bool)ItemInstances[i] && ItemInstances[i].itemName == item.itemName && ItemVisuals[i].CheckSelected())
+            if ((bool)self.itemInstances[i] && self.itemInstances[i].itemName == item.itemName && self.itemVisuals[i].CheckSelected())
             {
                 selIndex = i;
             }
@@ -828,9 +829,7 @@ public partial class HasteAP
         if (itemName == "ArchipelagoShopItem")
         {
             if (FactSystem.GetFact(new Fact("APTempShopIndex")) == -1f){ return false; }
-            Type metaShopItemHandler = typeof(ShopItemHandler);
-            MethodInfo entryUnset = metaShopItemHandler.GetMethod("Unset", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(int)], null);
-            entryUnset.Invoke(self, [(int)(FactSystem.GetFact(new Fact("APTempShopIndex")))]);
+            self.Unset((int)(FactSystem.GetFact(new Fact("APTempShopIndex"))));
             FactSystem.SetFact(new Fact("APTempShopIndex"), 0f);
             return true;
         } else
@@ -904,11 +903,6 @@ public partial class HasteAP
 
     private static void StaticMetaProgressionUnlockOverloadHook(On.Landfall.Haste.AbilityUnlockScreen.orig_Unlock orig, AbilityUnlockScreen self)
     {
-        // Get the type of the AbilityUnlockScreen
-        Type unlockScreenType = typeof(AbilityUnlockScreen);
-
-        // Use reflection to get the private field "Character"
-        FieldInfo characterField = unlockScreenType.GetField("Character", BindingFlags.NonPublic | BindingFlags.Instance);
 
         if (connection == null)
         {
@@ -916,18 +910,16 @@ public partial class HasteAP
             return;
         }
 
-        // Get the value of the "Character" field from the unlockScreen instance
-        var interactionCharacter = characterField.GetValue(self) as InteractionCharacter;
-        if (interactionCharacter == null)
+        if (self.Character == null)
         {
             ApDebugLog.Instance.DisplayMessage("The 'Character' field is null or not of type InteractionCharacter.");
             return;
         }
-        var ability_name = Enum.GetName(typeof(AbilityKind), interactionCharacter.Ability);
+        var ability_name = Enum.GetName(typeof(AbilityKind), self.Character.Ability);
         var ability_location = $"{GetAbilityName(ability_name)} Purchase";
         UnityMainThreadDispatcher.Instance().log("AP sending Ability: (" + ability_location + ")");
         ApDebugLog.Instance.DisplayMessage($"Ability Got: {ability_name}");
-        var cost = MetaProgression.Instance.GetEntry(interactionCharacter.Ability).cost;
+        var cost = MetaProgression.Instance.GetEntry(self.Character.Ability).cost;
         MetaProgression.AddResource(-cost);
 
         connection.SendLocation(ability_location);
@@ -947,46 +939,39 @@ public partial class HasteAP
         // this is basically just the decompiled original code with added jank lmao
         if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
         {
-            Type metaRowType = typeof(MetaProgressionRowUI);
-            // type reflection to get around private values being annoying 
-            FieldInfo entryField = metaRowType.GetField("_entry", BindingFlags.NonPublic | BindingFlags.Instance);
-            var entry = entryField.GetValue(self) as MetaProgression.Entry;
 
-            FieldInfo sfxField = metaRowType.GetField("sfx", BindingFlags.NonPublic | BindingFlags.Instance);
-            var sfx = sfxField.GetValue(self) as MetaProgressionSFX;
-
-            ValueTuple<int, bool, bool> costToUpgrade = entry.GetCostToUpgrade();
+            ValueTuple<int, bool, bool> costToUpgrade = self._entry.GetCostToUpgrade();
             int item = costToUpgrade.Item1;
             if (!costToUpgrade.Item2)
             {
-                if (sfx && sfx.noMoney)
+                if (self.sfx && self.sfx.noMoney)
                 {
-                    sfx.noMoney.Play();
+                    self.sfx.noMoney.Play();
                 }
                 return;
             }
-            if (sfx)
+            if (self.sfx)
             {
-                if (sfx.press)
+                if (self.sfx.press)
                 {
-                    sfx.press.Play();
+                    self.sfx.press.Play();
                 }
-                if (sfx.increase)
+                if (self.sfx.increase)
                 {
-                    sfx.increase.sfxs[0].settings.pitch = 1f + (float)item / 2000f;
-                    sfx.increase.Play();
+                    self.sfx.increase.sfxs[0].settings.pitch = 1f + (float)item / 2000f;
+                    self.sfx.increase.Play();
                 }
             }
-            connection.SendLocation(GetCaptainUpgradeName(self.kind.ToString(), entry.CurrentLevel));
-            int? nextLevel = entry.GetNextLevel(entry.CurrentLevel);
+            connection.SendLocation(GetCaptainUpgradeName(self.kind.ToString(), self._entry.CurrentLevel));
+            int? nextLevel = self._entry.GetNextLevel(self._entry.CurrentLevel);
             if (nextLevel != null)
             {
                 int valueOrDefault = nextLevel.GetValueOrDefault();
-                entry.CurrentLevel = valueOrDefault;
+                self._entry.CurrentLevel = valueOrDefault;
             }
             else
             {
-                ApDebugLog.Instance.DisplayMessage(string.Format("Error: could not get next level for {0} (currernt level = {1}). This shouldn't happen due to checks above.", entry.fact, entry.CurrentLevel));
+                ApDebugLog.Instance.DisplayMessage(string.Format("Error: could not get next level for {0} (currernt level = {1}). This shouldn't happen due to checks above.", self._entry.fact, self._entry.CurrentLevel));
             }
             FactSystem.AddToFact(MetaProgression.MetaProgressionResource, (float)(-(float)item));
             SaveSystem.Save();
@@ -1030,7 +1015,11 @@ public partial class HasteAP
 
     private static void StaticMetaProgressionUnlockHook(On.Landfall.Haste.MetaProgression.orig_Unlock orig, AbilityKind abilityKind)
     {
-        FactSystem.SetFact(new Fact("APNoAbility"), 0f);
+        if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
+        {
+            FactSystem.SetFact(new Fact("active_ability"), Convert.ToSingle(abilityKind));
+            FactSystem.SetFact(new Fact("APNoAbility"), 0f);
+        }
         switch (abilityKind)
         {
             case AbilityKind.BoardBoost:
@@ -1084,14 +1073,11 @@ public partial class HasteAP
 
             var rowText = StatType.gameObject.GetComponent<TextMeshProUGUI>();
             //ApDebugLog.Instance.DisplayMessage($"chaning data for row {rowText.text} of obj {rowText.GetInstanceID()}");
-            // type reflection to get around private values being annoying 
-            Type metaRowType = typeof(MetaProgressionRowUI);
-            FieldInfo entryField = metaRowType.GetField("_entry", BindingFlags.NonPublic | BindingFlags.Instance);
-            var entry = entryField.GetValue(self) as MetaProgression.Entry;
 
-            var locationData = connection.RetrieiveLocationData(GetCaptainUpgradeName(self.kind.ToString(), Math.Min(entry.CurrentLevel, entry.levels.Length-2)));
+
+            var locationData = connection.RetrieiveLocationData(GetCaptainUpgradeName(self.kind.ToString(), Math.Min(self._entry.CurrentLevel, self._entry.levels.Length-2)));
             rowText.text = $"{locationData.Item1} for {locationData.Item2}";
-            rowText.rectTransform.offsetMax = new Vector2(-188f, rowText.rectTransform.offsetMax.y);
+            rowText.rectTransform.offsetMax = new Vector2(-248f, rowText.rectTransform.offsetMax.y);
             //ApDebugLog.Instance.DisplayMessage($"changes complete for {rowText.text} of obj {rowText.GetInstanceID()}");
         }
     }
@@ -1194,7 +1180,7 @@ public partial class HasteAP
                 connection.SendHintedLocation($"{GetAbilityName(abilityName)} Purchase");
             }
         }
-        orig(self);
+        if (!connection!.IsLocationChecked($"{GetAbilityName(abilityName)} Purchase")) orig(self);
     }
 
 

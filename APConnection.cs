@@ -260,18 +260,21 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APFragmentsanityDistribution"), Convert.ToSingle(FragmentsanityDist));
             if (Convert.ToSingle(FragmentsanityDist) == 1f)
             {
-                loginSuccess.SlotData.TryGetValue("Linear Fragmentsanity Rate", out object LFR);
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard1")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard1"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard2")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard2"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard3")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard3"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard4")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard4"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard5")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard5"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard6")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard6"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard7")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard7"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard8")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard8"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard9")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard9"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitShard10")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitShard10"), Convert.ToSingle(LFR));
-                if (FactSystem.GetFact(new Fact("APFragmentLimitGlobal")) == 0f) FactSystem.SetFact(new Fact("APFragmentLimitGlobal"), Convert.ToSingle(LFR));
+                if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+                {
+                    loginSuccess.SlotData.TryGetValue("Linear Fragmentsanity Rate", out object LFR);
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard1"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard2"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard3"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard4"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard5"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard6"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard7"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard8"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard9"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard10"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitGlobal"), Convert.ToSingle(LFR));
+                }
             }
             
         }
@@ -369,15 +372,26 @@ public class Connection(string hostname, int port)
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get StartingAbility from slot data:" + loginSuccess.SlotData.toJson());
         }
 
-        if (loginSuccess.SlotData.TryGetValue("Permanent Items", out object PermItems))
+        if (loginSuccess.SlotData.TryGetValue("Persistent Items", out object PermItems))
         {
 
             UnityMainThreadDispatcher.Instance().log($"AP found PermItems in slot data with value: {PermItems}");
-            FactSystem.SetFact(new Fact("APPermanentItems"), Convert.ToSingle(PermItems));
+            FactSystem.SetFact(new Fact("APPersistentItems"), Convert.ToSingle(PermItems));
         }
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get PermItems from slot data:" + loginSuccess.SlotData.toJson());
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("S-Rank Bonus", out object SRankBonus))
+        {
+
+            UnityMainThreadDispatcher.Instance().log($"AP found SRankBonus in slot data with value: {SRankBonus}");
+            FactSystem.SetFact(new Fact("APSRankBonus"), Convert.ToSingle(SRankBonus));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get SRankBonus from slot data:" + loginSuccess.SlotData.toJson());
         }
 
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))
@@ -424,7 +438,7 @@ public class Connection(string hostname, int port)
             if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f && Convert.ToSingle(UnlockAllItems) == 1)
             {
                 //only unlock once
-                ItemDatabase.UnlockAll();
+                ItemDatabase.UnlockAndShowAll();
             }
         }
         else
@@ -442,7 +456,7 @@ public class Connection(string hostname, int port)
         FactSystem.SetFact(new Fact("APMessageFilter"), (float)settingsHandler.GetSetting<ApLogFilter>().Value);
 
 
-        // SaveSystem.Save();
+        SaveSystem.Save();
 
         return true;
     }

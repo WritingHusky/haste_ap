@@ -23,7 +23,7 @@ namespace Integration
             var _shardCount = connection!.GetItemCount("Progressive Shard");
             if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
             {
-                // if unlock-order is Boss-locked, then only uplock up until the lowest of either bossbeated or shards
+                // if unlock-order is Boss-locked, then only unlock up until the lowest of either bossbeated or shards
                 _shardCount = Math.Min(_shardCount, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
                 UnityMainThreadDispatcher.Instance().log("AP ShardUnlock is set to bosses, new count: " + _shardCount);
             } 
@@ -39,6 +39,7 @@ namespace Integration
             ApDebugLog.Instance.DisplayMessage($"Giving item: {itemName}");
             bool worthMentioning = false;
             int? quantity = null;
+            NotificationType type = NotificationType.Progression;
 
             try
             {
@@ -63,35 +64,30 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Filler");
                         break;
                     case "Wraith's Hourglass":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Abilty Slomo");
+                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Slomo");
                         ApDebugLog.Instance.DisplayMessage("Got Wraith's Hourglass");
                         MetaProgression.Unlock(AbilityKind.Slomo);
-                        MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
-                        //TODO: for this and other abilities add a check for if this is the first ability, and if it is, force equip it
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Heir's Javelin":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Abilty Grapple");
+                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Grapple");
                         ApDebugLog.Instance.DisplayMessage("Got Heir's Javelin");
                         MetaProgression.Unlock(AbilityKind.Grapple);
-                        MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Sage's Cowl":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Abilty Fly");
+                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Fly");
                         ApDebugLog.Instance.DisplayMessage("Got Sage's Cowl");
                         MetaProgression.Unlock(AbilityKind.Fly);
-                        MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Courier's Board":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Abilty Boost");
+                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Boost");
                         ApDebugLog.Instance.DisplayMessage("Got Courier's Board");
                         MetaProgression.Unlock(AbilityKind.BoardBoost);
-                        MonoFunctions.DelayCall(AbilityTutorial, 0.5f);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
@@ -186,84 +182,84 @@ namespace Integration
                         quantity = connection!.GetItemCount("Starting Sparks Upgrade");
                         Player.localPlayer.ResetStats();
                         break;
-                    case "Permanent Common Speed Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Common Speed Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Common Speed Item");
+                    case "Persistent Common Speed Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Speed Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Common Speed Item");
                         FactSystem.AddToFact(new Fact("APCommonSpeedItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Common Speed Item");
+                        quantity = connection!.GetItemCount("Persistent Common Speed Item");
                         ForcePermItem(Rarity.Common, APItemCategory.Speed);
                         break;
-                    case "Permanent Common Support Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Common Support Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Common Support Item");
+                    case "Persistent Common Support Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Support Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Common Support Item");
                         FactSystem.AddToFact(new Fact("APCommonSupportItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Common Support Item");
+                        quantity = connection!.GetItemCount("Persistent Common Support Item");
                         ForcePermItem(Rarity.Common, APItemCategory.Support);
                         break;
-                    case "Permanent Common Health Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Common Health Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Common Health Item");
+                    case "Persistent Common Health Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Health Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Common Health Item");
                         FactSystem.AddToFact(new Fact("APCommonHealthItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Common Health Item");
+                        quantity = connection!.GetItemCount("Persistent Common Health Item");
                         ForcePermItem(Rarity.Common, APItemCategory.Health);
                         break;
-                    case "Permanent Rare Speed Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Rare Speed Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Rare Speed Item");
+                    case "Persistent Rare Speed Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Rare Speed Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Rare Speed Item");
                         FactSystem.AddToFact(new Fact("APRareSpeedItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Rare Speed Item");
+                        quantity = connection!.GetItemCount("Persistent Rare Speed Item");
                         ForcePermItem(Rarity.Rare, APItemCategory.Speed);
                         break;
-                    case "Permanent Rare Support Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Rare Support Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Rare Support Item");
+                    case "Persistent Rare Support Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Rare Support Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Rare Support Item");
                         FactSystem.AddToFact(new Fact("APRareSupportItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Rare Support Item");
+                        quantity = connection!.GetItemCount("Persistent Rare Support Item");
                         ForcePermItem(Rarity.Rare, APItemCategory.Support);
                         break;
-                    case "Permanent Rare Health Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Rare Health Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Rare Health Item");
+                    case "Persistent Rare Health Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Rare Health Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Rare Health Item");
                         FactSystem.AddToFact(new Fact("APRareHealthItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Rare Health Item");
+                        quantity = connection!.GetItemCount("Persistent Rare Health Item");
                         ForcePermItem(Rarity.Rare, APItemCategory.Health);
                         break;
-                    case "Permanent Epic Speed Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Epic Speed Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Epic Speed Item");
+                    case "Persistent Epic Speed Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Epic Speed Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Epic Speed Item");
                         FactSystem.AddToFact(new Fact("APEpicSpeedItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Epic Speed Item");
+                        quantity = connection!.GetItemCount("Persistent Epic Speed Item");
                         ForcePermItem(Rarity.Epic, APItemCategory.Speed);
                         break;
-                    case "Permanent Epic Support Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Epic Support Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Epic Support Item");
+                    case "Persistent Epic Support Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Epic Support Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Epic Support Item");
                         FactSystem.AddToFact(new Fact("APEpicSupportItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Epic Support Item");
+                        quantity = connection!.GetItemCount("Persistent Epic Support Item");
                         ForcePermItem(Rarity.Epic, APItemCategory.Support);
                         break;
-                    case "Permanent Epic Health Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Epic Health Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Epic Health Item");
+                    case "Persistent Epic Health Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Epic Health Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Epic Health Item");
                         FactSystem.AddToFact(new Fact("APEpicHealthItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Epic Health Item");
+                        quantity = connection!.GetItemCount("Persistent Epic Health Item");
                         ForcePermItem(Rarity.Epic, APItemCategory.Health);
                         break;
-                    case "Permanent Legendary Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Permanent Legendary Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Permanent Legendary Item");
+                    case "Persistent Legendary Item":
+                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Legendary Item");
+                        ApDebugLog.Instance.DisplayMessage("Got Persistent Legendary Item");
                         FactSystem.AddToFact(new Fact("APLegendaryItems"), 1f);
                         worthMentioning = true;
-                        quantity = connection!.GetItemCount("Permanent Legendary Item");
+                        quantity = connection!.GetItemCount("Persistent Legendary Item");
                         ForcePermItem(Rarity.Legendary, APItemCategory.Legendary);
                         break;
                     case "Anti-Spark 10 bundle":
@@ -300,11 +296,15 @@ namespace Integration
                         UnityMainThreadDispatcher.Instance().log("AP Got Disaster Trap");
                         ApDebugLog.Instance.DisplayMessage("Got Disaster Trap");
                         FactSystem.AddToFact(new Fact("APQueuedDisasterTraps"), 1f);
+                        worthMentioning = true;
+                        type = NotificationType.Trap;
                         break;
                     case "Landing Downgrade Trap":
                         UnityMainThreadDispatcher.Instance().log("AP Got Landing Downgrade Trap");
                         ApDebugLog.Instance.DisplayMessage("Got Landing Downgrade Trap");
                         FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), 1f);
+                        worthMentioning = true;
+                        type = NotificationType.Trap;
                         break;
                     default:
                         UnityMainThreadDispatcher.Instance().logError("Item '" + itemName + "' has no handling");
@@ -320,7 +320,7 @@ namespace Integration
                     ApDebugLog.Instance.DisplayMessage($"Error within give item {e.Message},{e.StackTrace}", duration: 10f);
                 }
             }
-            if (worthMentioning) MonoFunctions.instance.StartCoroutine(ItemPopup(itemName, givingPlayerName, quantity));
+            if (worthMentioning) Player.localPlayer.StartCoroutine(ItemPopup(itemName, givingPlayerName, quantity, type));
 
             //SaveSystem.Save();
         }
@@ -331,8 +331,31 @@ namespace Integration
             if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
             {
                 UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
-                //TODO: test if this actually fixes the captains shard freeze
-                //TODO: give control back to the player somehow
+                ApDebugLog.Instance.DisplayMessage($"Hub reload has been forced. Hold tight.", isDebug:false);
+                try
+                {
+                    // close UI that might not exist
+                    Type MetaUIType = typeof(MetaProgressionRowUI).Assembly.GetType("Landfall.Haste.MetaProgressionUI");
+                    MethodInfo closeUIInfo = MetaUIType.GetMethod("CloseUI", BindingFlags.Instance | BindingFlags.Public);
+                    object metaUiInstance = GameObject.FindAnyObjectByType(MetaUIType);
+                    closeUIInfo.Invoke(metaUiInstance, null);
+                } catch (Exception) { }
+
+                try
+                {
+                    // close UI that might not exist
+                    Type MetaSkinUIType = typeof(MetaProgressionRowUI).Assembly.GetType("Landfall.Haste.SkinSelectionUI");
+                    MethodInfo closeUIInfo2 = MetaSkinUIType.GetMethod("CloseUI", BindingFlags.Instance | BindingFlags.Public);
+                    object metaSkinUiInstance = GameObject.FindAnyObjectByType(MetaSkinUIType);
+                    closeUIInfo2.Invoke(metaSkinUiInstance, null);
+                }
+                catch (Exception) { }
+
+                // tell the game that the 2 other hub UIs are closed
+                AlltimeStatsScreen.IsOpen = false;
+                UI_UnlockedItemsScreen.IsOpen = false;
+                // see how much easier this is when the class is public and you don't need to go through type reflection?
+
                 TimeHandler.instance.ResetTime();
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
@@ -354,49 +377,47 @@ namespace Integration
         [ConsoleCommand]
         public static void ForceItemPopup()
         {
-            MonoFunctions.instance.StartCoroutine(ItemPopup("LONG DEBUGGING ITEM NAME", "Command Line", 2));
+            Player.localPlayer.StartCoroutine(ItemPopup("LONG DEBUGGING ITEM NAME", "Command Line", 2));
         }
 
-        public static IEnumerator ItemPopup(string itemName, string givingPlayer, int? quantity)
+        public static IEnumerator ItemPopup(string itemName, string givingPlayer, int? quantity, NotificationType type=NotificationType.Progression)
         {
-            yield return new WaitForSeconds(1f);
+            yield return null;
             //NotificationHandler.Instance
             var inst = Singleton<NotificationHandler>.Instance;
             GameObject notificationPrefab = inst.notificationPrefabs.Find((GameObject n) => n.GetComponent<NotificationMessage>() is FragmentModifierNotification);
             FragmentModifierNotification fragmentModifierNotification = inst.SpawnNotification(notificationPrefab) as FragmentModifierNotification;
             fragmentModifierNotification.EffectDescription.text = $"{itemName}";
             if (quantity != null) fragmentModifierNotification.EffectDescription.text += $" <style=+s>#{quantity}</style>";
-            fragmentModifierNotification.EffectDescription.rectTransform.localPosition = new Vector3(-16f, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.y, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.z);
-            //TODO: fix the new notifciation once HarmonyX gets their shit together
-            fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Header").gameObject.GetComponent<TextMeshProUGUI>().text = $"Item from {givingPlayer}";
+            fragmentModifierNotification.EffectDescription.rectTransform.localPosition = new Vector3(0f, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.y, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.z);
+            var headerpart = fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Header");
+            headerpart.gameObject.GetComponent<TextMeshProUGUI>().text = $"Item from {givingPlayer}";
+            headerpart.gameObject.GetComponent<RectTransform>().localPosition = new Vector3(0f, headerpart.gameObject.GetComponent<RectTransform>().localPosition.y, headerpart.gameObject.GetComponent<RectTransform>().localPosition.z);
+            fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Divider").gameObject.SetActive(false);
+            fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("IconBackground").gameObject.SetActive(false);
             fragmentModifierNotification.IconImage.gameObject.SetActive(false);
+
+            if (type == NotificationType.Trap)
+            {
+                fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Background").gameObject.GetComponent<UnityEngine.UI.Image>().color = new Color(1f, 0.2924f, 0.3207f);
+            }
+
             fragmentModifierNotification.animator.Play("NotificationMessageIn");
             fragmentModifierNotification.animator.SetBool("Play", true);
         }
 
         public static void GiveDeath(DeathLink death)
         {
-            UnityMainThreadDispatcher.Instance().log("AP DeathLink recieved");
-            ApDebugLog.Instance.DisplayMessage("Death Recieved", isDebug:false);
-            var cause = "Unkown";
+            UnityMainThreadDispatcher.Instance().log("AP DeathLink received");
+            ApDebugLog.Instance.DisplayMessage("Death Received", isDebug:false);
+            var cause = "Unknown";
             if (death.Cause != null)
             {
                 cause = death.Cause;
             }
             UnityMainThreadDispatcher.Instance().log("AP Lets try to Kill the player!");
-            var gm_runType = GM_Run.instance.GetType();
-            var FallOutMethod = gm_runType.GetMethod("FallOut", BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic, null, [typeof(PlayerCharacter)], null);
-
-            if (FallOutMethod != null)
-            {
-                // Invoke the method
-                FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
-                FallOutMethod.Invoke(GM_Run.instance, [PlayerCharacter.localPlayer]);
-            }
-            else
-            {
-                UnityMainThreadDispatcher.Instance().logError("Fallout method not found on GM_RUN.");
-            }
+            FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
+            GM_Run.instance.FallOut(PlayerCharacter.localPlayer);
         }
 
         // Sets NPCs in overworld

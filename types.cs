@@ -63,3 +63,9 @@ public enum TrapsList
     Disaster,
     Landing
 }
+
+public enum NotificationType
+{
+    Progression,
+    Trap
+}
