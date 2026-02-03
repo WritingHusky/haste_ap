@@ -1,24 +1,13 @@
 using APConnection;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
-using Archipelago.MultiClient.Net.Enums;
-using IL.JetBrains.Annotations;
 using Landfall.Haste;
 using Landfall.Modding;
-using MonoMod.Core.Platforms;
-using System.ComponentModel.Design;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Threading;
 using TMPro;
-using Unity.Properties;
 using UnityEngine;
-using UnityEngine.InputSystem;
-using UnityEngine.InputSystem.Interactions;
 using UnityEngine.Localization;
-using Zorro.Core;
 using Zorro.Core.CLI;
 using Zorro.Settings;
-using static HelperFunctions;
 using static Integration.Integration;
 
 [LandfallPlugin]
@@ -78,7 +67,7 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APFirstLoad")) != FactSystem.GetFact(new Fact("tutorial_finished")))
         {
             UnityMainThreadDispatcher.Instance().log("AP save check mismatched. Likely a vanilla save. Aborting.");
-            ApDebugLog.Instance.DisplayMessage("<color=#FF0000>Non-Archipelago savefile detected.</color>\nThis mod relies on changing many vanilla savedata behaviours and therefore cannot be played on a normal save. Please switch to a fresh savefile (from the 'General' settings menu) or a save that already has AP data.\nIf you believe this is in error, please contact the developer of this mod.", isDebug: false, duration: 10f);
+            ApDebugLog.Instance.DisplayMessage("<color=#FF0000>Non-Archipelago savefile detected.</color>\nThis mod relies on changing many vanilla savedata behaviours and therefore cannot be played on a normal savefile. Please switch to a fresh savefile (from the 'General' settings menu) or a save that already has AP data.\nIf you believe this is in error, please contact the developer of this mod.", isDebug: false, duration: 10f);
             return;
         }
 
@@ -1180,6 +1169,7 @@ public partial class HasteAP
                 connection.SendHintedLocation($"{GetAbilityName(abilityName)} Purchase");
             }
         }
+        // almost certainly i'm gonna need to adjust this for the non-check NPCs
         if (!connection!.IsLocationChecked($"{GetAbilityName(abilityName)} Purchase")) orig(self);
     }
 
@@ -1192,12 +1182,14 @@ public partial class HasteAP
             //reset globals
             if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitGlobal"), 1f); }
             FactSystem.SetFact(new Fact($"APFragmentsanityGlobal"), 0f);
+            FactSystem.SetFact(new Fact($"APFragmentsanityLocationGlobal"), 0f);
         } else
         {
             if (shard < 0 || shard > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
             // only reset limit for non-linear dist
             if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitShard{shard}"), 1f); }
             FactSystem.SetFact(new Fact($"APFragmentsanityShard{shard}"), 0f);
+            FactSystem.SetFact(new Fact($"APFragmentsanityLocationShard{shard}"), 0f);
         }
     }
 
@@ -1229,11 +1221,11 @@ public partial class HasteAP
     //}
 
     // will delete later
-    [ConsoleCommand]
-    public static void SendBuggedLocation(string loc)
-    {
-        connection.SendLocation(loc);
-    }
+    // [ConsoleCommand]
+    // public static void SendBuggedLocation(string loc)
+    // {
+    //     connection.SendLocation(loc);
+    // }
 }
 
 // Settings For AP server connection

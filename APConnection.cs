@@ -59,7 +59,7 @@ public class Connection(string hostname, int port)
 
         // Successfully connected, `ArchipelagoSession` (assume statically defined as `session` from now on) can now be used to interact with the server and the returned `LoginSuccessful` contains some useful information about the initial connection (e.g. a copy of the slot data as `loginSuccess.SlotData`)
         var loginSuccess = (LoginSuccessful)result;
-        UnityMainThreadDispatcher.Instance().log("AP Connection Succeded");
+        UnityMainThreadDispatcher.Instance().log("AP Connection Succeeded");
 
         dataTag = $"Haste_{loginSuccess.Team}_{loginSuccess.Slot}_";
 
@@ -86,8 +86,21 @@ public class Connection(string hostname, int port)
             if (modVersion.CompareTo(apVersion) > 0)
             {
                 // mod is newer than AP
-                ApDebugLog.Instance.DisplayMessage($"<color=#FFFF00>WARNING:</color> Mod version {modVersion} is newer than APworld version {apVersion}.\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the smoothest experience.", isDebug:false);
+                ApDebugLog.Instance.DisplayMessage($"<color=#FFFF00>WARNING:</color> Mod version ({modVersion}) is newer than APworld version ({apVersion}).\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the smoothest experience.", isDebug:false);
             }
+
+            if (FactSystem.GetFact(new Fact("APVersionMajor")) != 0 ||
+                FactSystem.GetFact(new Fact("APVersionMiddle")) != 0)
+            {
+                // if either of these values are pre-set it means that the savedata is already AP, and needs to be checked for a mismatch
+                string storedAPworldVersion = $"{FactSystem.GetFact(new Fact("APVersionMajor"))}.{FactSystem.GetFact(new Fact("APVersionMiddle"))}.{FactSystem.GetFact(new Fact("APVersionMinor"))}";
+                if (apVersion.CompareTo(new Version(storedAPworldVersion)) != 0)
+                {
+                    ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The APworld version of the Archipelago room ({apVersion}) does not match the version stored in the selected savefile ({storedAPworldVersion}).\nPlease switch to the correct savefile (from the 'General' settings menu) or create a new one.", isDebug:false);
+                    return false;
+                }
+            }
+            
 
             string[] subs = VersionNum.ToString().Split('.');
             FactSystem.SetFact(new Fact("APVersionMajor"), Convert.ToSingle(int.Parse(subs[0])));
@@ -100,7 +113,7 @@ public class Connection(string hostname, int port)
             FactSystem.SetFact(new Fact("APVersionMajor"), 0f);
             FactSystem.SetFact(new Fact("APVersionMiddle"), 2f);
             FactSystem.SetFact(new Fact("APVersionMinor"), 0f);
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Your APworld is so out of date that it doesn't even have a version number, and almost certainly will not work properly with this mod (v{modVersion}).\nPlease update your APworld as soon as possible to ensure your seed will function correctly.", isDebug: false);
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Your APworld is so out of date that it doesn't even have a version number, and almost certainly will not work properly with this mod (v{modVersion}).\nPlease update your APworld as soon as possible to ensure your game will function correctly.", isDebug: false);
         }
 
         if (loginSuccess.SlotData.TryGetValue("ForceReload", out object ForceReload))
@@ -360,8 +373,6 @@ public class Connection(string hostname, int port)
                         case 4f:
                             MetaProgression.Unlock(AbilityKind.Fly);
                             break;
-                        default:
-                            break;
 
                     }
                 }
@@ -551,7 +562,7 @@ public class Connection(string hostname, int port)
                 UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName}");
                 ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {receivedItemsHelper.Index}");
                 GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
-                FactSystem.AddToFact(new Fact("APExpectedIndex"), 1);
+                FactSystem.SetFact(new Fact("APExpectedIndex"), receivedItemsHelper.Index);
                 SaveSystem.Save();
 
 

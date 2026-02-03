@@ -385,6 +385,7 @@ namespace Integration
             yield return null;
             //NotificationHandler.Instance
             var inst = Singleton<NotificationHandler>.Instance;
+            if (!inst) yield break;
             GameObject notificationPrefab = inst.notificationPrefabs.Find((GameObject n) => n.GetComponent<NotificationMessage>() is FragmentModifierNotification);
             FragmentModifierNotification fragmentModifierNotification = inst.SpawnNotification(notificationPrefab) as FragmentModifierNotification;
             fragmentModifierNotification.EffectDescription.text = $"{itemName}";
