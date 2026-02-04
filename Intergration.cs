@@ -429,8 +429,14 @@ namespace Integration
                 FactSystem.SetFact(new Fact("captain_in_hub"), FactSystem.GetFact(new Fact("APCaptainInHub")));
                 FactSystem.SetFact(new Fact("heir_in_hub"), FactSystem.GetFact(new Fact("APHeirInHub")));
                 FactSystem.SetFact(new Fact("wraith_in_hub"), FactSystem.GetFact(new Fact("APWraithInHub")));
-                FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), FactSystem.GetFact(new Fact("APFashionInHub")));
                 FactSystem.SetFact(new Fact("sage_in_hub"), FactSystem.GetFact(new Fact("APSageInHub")));
+                if (FactSystem.GetFact(new Fact("APFashionInHub")) == 1f)
+                {
+                    FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), 1f);
+                    SkinManager.UnlockFashionableWeeboh();
+                }
+                
+                
             }
             else
             {
@@ -438,6 +444,7 @@ namespace Integration
                 FactSystem.SetFact(new Fact("heir_in_hub"), 1f);
                 FactSystem.SetFact(new Fact("wraith_in_hub"), 1f);
                 FactSystem.SetFact(new Fact("fashion_weeboh_in_hub"), 1f);
+                SkinManager.UnlockFashionableWeeboh();
                 FactSystem.SetFact(new Fact("sage_in_hub"), 1f);
             }
             FactSystem.SetFact(new Fact("researcher_in_hub"), 1f);
