@@ -3,6 +3,7 @@ using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Landfall.Haste;
 using Landfall.Modding;
 using System.Reflection;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -1218,7 +1219,7 @@ public partial class HasteAP
             FactSystem.SetFact(new Fact($"APFragmentsanityLocationGlobal"), 0f);
         } else
         {
-            if (shard < 0 || shard > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
+            if (shard is < 0 or > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
             // only reset limit for non-linear dist
             if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitShard{shard}"), 1f); }
             FactSystem.SetFact(new Fact($"APFragmentsanityShard{shard}"), 0f);
@@ -1236,9 +1237,18 @@ public partial class HasteAP
         }
         else
         {
-            if (shard < 0 || shard > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
+            if (shard is < 0 or > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
             FactSystem.SetFact(new Fact($"APShopsanityShard{shard}"), 0f);
         }
+    }
+
+    [ConsoleCommand]
+    public static void JacobAsked()
+    {
+        string thedump = FactSystem.GetSerializedFacts().Aggregate("", (current, fact) => current + $"{fact.Key} :: {fact.Value}\n");
+        // dumps into haste directory on steam
+        File.WriteAllText($"JacobAskedOn_{DateTime.Now:MM-dd-yyyy_hh-mm-ss}.txt", thedump, new UTF8Encoding());
+        UnityMainThreadDispatcher.Instance().logError($"Savedata information has been saved to your Haste directory. Go send that file to Jacob, who asked for this.\nTo find this directory go to Haste in your Steam Library, Right Click -> Manage -> Browse Local Files");
     }
 
     //[ConsoleCommand]
@@ -1253,12 +1263,27 @@ public partial class HasteAP
     //    File.WriteAllText("hastedump.txt", thedump);
     //}
 
-    // will delete later
-    // [ConsoleCommand]
-    // public static void SendBuggedLocation(string loc)
-    // {
-    //     connection.SendLocation(loc);
-    // }
+    #if DEBUG
+    // my debug commands, not yours
+    [ConsoleCommand]
+    public static void SendLocation(string loc)
+    {
+        connection.SendLocation(loc);
+    }
+    
+    
+    [ConsoleCommand]
+    public static void ImportSaveData(string path)
+    {
+        // reads all lines from input and sets them as my own savedata
+        var lines = File.ReadLines(path, new UTF8Encoding());
+        foreach (var line in lines)
+        {
+            var splits =  line.Split(" :: ");
+            FactSystem.SetFact(new Fact(splits[0]), float.Parse(splits[1]));
+        }
+    }
+    #endif
 }
 
 // Settings For AP server connection
