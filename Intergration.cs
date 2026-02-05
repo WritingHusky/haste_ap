@@ -384,27 +384,38 @@ namespace Integration
         {
             yield return null;
             //NotificationHandler.Instance
-            var inst = Singleton<NotificationHandler>.Instance;
-            if (!inst) yield break;
-            GameObject notificationPrefab = inst.notificationPrefabs.Find((GameObject n) => n.GetComponent<NotificationMessage>() is FragmentModifierNotification);
-            FragmentModifierNotification fragmentModifierNotification = inst.SpawnNotification(notificationPrefab) as FragmentModifierNotification;
-            fragmentModifierNotification.EffectDescription.text = $"{itemName}";
-            if (quantity != null) fragmentModifierNotification.EffectDescription.text += $" <style=+s>#{quantity}</style>";
-            fragmentModifierNotification.EffectDescription.rectTransform.localPosition = new Vector3(0f, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.y, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.z);
-            var headerpart = fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Header");
-            headerpart.gameObject.GetComponent<TextMeshProUGUI>().text = $"Item from {givingPlayer}";
-            headerpart.gameObject.GetComponent<RectTransform>().localPosition = new Vector3(0f, headerpart.gameObject.GetComponent<RectTransform>().localPosition.y, headerpart.gameObject.GetComponent<RectTransform>().localPosition.z);
-            fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Divider").gameObject.SetActive(false);
-            fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("IconBackground").gameObject.SetActive(false);
-            fragmentModifierNotification.IconImage.gameObject.SetActive(false);
-
-            if (type == NotificationType.Trap)
+            try
             {
-                fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Background").gameObject.GetComponent<UnityEngine.UI.Image>().color = new Color(1f, 0.2924f, 0.3207f);
-            }
+                UnityMainThreadDispatcher.Instance().log($"Attempting to spawn popup for {itemName}");
+                var inst = Singleton<NotificationHandler>.Instance;
+                if (!inst) yield break;
+                GameObject notificationPrefab = inst.notificationPrefabs.Find((GameObject n) => n.GetComponent<NotificationMessage>() is FragmentModifierNotification);
+                FragmentModifierNotification fragmentModifierNotification = inst.SpawnNotification(notificationPrefab) as FragmentModifierNotification;
+                fragmentModifierNotification.EffectDescription.text = $"{itemName}";
+                if (quantity != null) fragmentModifierNotification.EffectDescription.text += $" <style=+s>#{quantity}</style>";
+                fragmentModifierNotification.EffectDescription.rectTransform.localPosition = new Vector3(0f, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.y, fragmentModifierNotification.EffectDescription.rectTransform.localPosition.z);
+                var headerpart = fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Header");
+                headerpart.gameObject.GetComponent<TextMeshProUGUI>().text = $"Item from {givingPlayer}";
+                headerpart.gameObject.GetComponent<RectTransform>().localPosition = new Vector3(0f, headerpart.gameObject.GetComponent<RectTransform>().localPosition.y, headerpart.gameObject.GetComponent<RectTransform>().localPosition.z);
+                fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Divider").gameObject.SetActive(false);
+                fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("IconBackground").gameObject.SetActive(false);
+                fragmentModifierNotification.IconImage.gameObject.SetActive(false);
 
-            fragmentModifierNotification.animator.Play("NotificationMessageIn");
-            fragmentModifierNotification.animator.SetBool("Play", true);
+                if (type == NotificationType.Trap)
+                {
+                    headerpart.gameObject.GetComponent<TextMeshProUGUI>().color = new Color(1f, 0.2924f, 0.3207f);
+                    fragmentModifierNotification.gameObject.transform.Find("INFO_AREA").Find("Background").gameObject.GetComponent<UnityEngine.UI.Image>().color = new Color(1f, 0.2924f, 0.3207f);
+                }
+
+                fragmentModifierNotification.animator.Play("NotificationMessageIn");
+                fragmentModifierNotification.animator.SetBool("Play", true);
+
+            }
+            catch (Exception e)
+            {
+                UnityMainThreadDispatcher.Instance().log($"Error within itempopup {e.Message},{e.StackTrace}");
+                ApDebugLog.Instance.DisplayMessage($"Error within itempopup {e.Message},{e.StackTrace}", duration: 10f);
+            }
         }
 
         public static void GiveDeath(DeathLink death)
