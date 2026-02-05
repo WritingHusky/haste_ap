@@ -99,14 +99,24 @@ public partial class HasteAP
             float seedpart = Convert.ToSingle(connection.session.RoomState.Seed[..8]);
             if (FactSystem.GetFact(new Fact("APFirstLoad")) > 0f)
             {
-                // compare
-                if (FactSystem.GetFact(new Fact("APRoomSeed")) != seedpart)
+                if (FactSystem.GetFact(new Fact("APRoomSeed")) == 0f)
                 {
-                    ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The seed of the Archipelago room does not match the seed stored in the save data.\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f);
-                    connection.Close();
-                    connection = null;
-                    return;
+                    // set. it shouldnt get to this part but idk man
+                    FactSystem.SetFact(new Fact("APRoomSeed"), seedpart);
                 }
+                else
+                {
+                    // compare
+                    if (FactSystem.GetFact(new Fact("APRoomSeed")) != seedpart)
+                    {
+                        ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The seed of the Archipelago room ({seedpart}) does not match the seed stored in the save data ({FactSystem.GetFact(new Fact("APRoomSeed"))}).\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f);
+                        connection.Close();
+                        connection = null;
+                        return;
+                    }
+                    
+                }
+
             } else
             {
                 // set
