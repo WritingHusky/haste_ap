@@ -93,7 +93,7 @@ public partial class HasteAP
             ApDebugLog.Instance.DisplayMessage("Connection Failed");
             return;
         }
-        if (FactSystem.GetFact(new Fact("APVersionMiddle")) >= 3f)
+        if (FactSystem.GetFact(new Fact("APVersionMiddle")) > 3f)
         {
             // takes only the first 8 chars for the seed because floats only store so much and surely this is enough to stop conflicts
             float seedpart = Convert.ToSingle(connection.session.RoomState.Seed[..8]);
@@ -184,7 +184,7 @@ public partial class HasteAP
         On.Landfall.Haste.SkinManager.SetFullOutfit += StaticSetFullOutfitHook;
         On.Landfall.Haste.SkinManager.HubWorldUnlockSkins += StaticHubWorldUnlockHook;
 
-        //On.SaveSystem.Load += StaticSaveLoadHook;
+        On.SaveSystem.Load += StaticSaveLoadHook;
 
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked += StaticMetaProgressionRowAddClickedHook;
         On.Landfall.Haste.MetaProgressionRowUI.RefreshUI += StaticMetaProgressionRefreshUIHook;
@@ -235,7 +235,7 @@ public partial class HasteAP
         On.Landfall.Haste.SkinManager.SetDefaultUnlockedSkins -= StaticDefaultUnlockedSkinsHook;
         On.Landfall.Haste.SkinManager.SetFullOutfit -= StaticSetFullOutfitHook;
         On.Landfall.Haste.SkinManager.HubWorldUnlockSkins -= StaticHubWorldUnlockHook;
-        //On.SaveSystem.Load -= StaticSaveLoadHook;
+        On.SaveSystem.Load -= StaticSaveLoadHook;
         On.Landfall.Haste.AbilityUnlockScreen.Unlock -= StaticMetaProgressionUnlockOverloadHook;
         On.InteractableCharacter.Start -= StaticInteractableCharacterStartHook;
         On.InteractableCharacter.Interact -= StaticInteractableCharacterInteractHook;
@@ -493,6 +493,7 @@ public partial class HasteAP
 
     private static void StaticRemoveTrapsOnDeath(On.Player.orig_Die orig, Player self)
     {
+        UnityMainThreadDispatcher.Instance().log($"Attempting to remove traps on death");
         DecrementTraps();
         orig(self);
     }
@@ -500,7 +501,9 @@ public partial class HasteAP
 
     private static void StaticStartOfFragmentHook(On.RunHandler.orig_PlayLevel orig)
     {
+        orig();
         // eval
+        UnityMainThreadDispatcher.Instance().log($"Start of fragment, evaluating traps");
         if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
         {
             RemoveTrap(TrapsList.Disaster);
@@ -527,17 +530,18 @@ public partial class HasteAP
         {
             FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
         }
-        orig();
     }
 
     private static void ActivateTrap(TrapsList traptype)
     {
+        UnityMainThreadDispatcher.Instance().log($"Attempting to activate trap {traptype}");
         switch (traptype)
         {
             case TrapsList.Disaster:
                 // i betcha there'll be some dumb shit i'm gonna need to fix when I eventually add the disaster shards as goals
                 if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
                 {
+                    UnityMainThreadDispatcher.Instance().log($"Attempting to add disaster trap");
                     FactSystem.SetFact(new Fact("APDisasterTrapActive"), 1f);
                     FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 1f);
                     ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
@@ -547,6 +551,7 @@ public partial class HasteAP
             case TrapsList.Landing:
                 if (FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
                 {
+                    UnityMainThreadDispatcher.Instance().log($"Attempting to add landing trap");
                     FactSystem.SetFact(new Fact("APLandingTrapActive"), 1f);
                     FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 1f);
                 }
@@ -558,7 +563,7 @@ public partial class HasteAP
 
     private static void DecrementTraps()
     {
-        
+        UnityMainThreadDispatcher.Instance().log($"Decrementing traps");
         if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) >= 1f)
         {
             FactSystem.AddToFact(new Fact("APDisasterTrapActive"), -1f);
@@ -571,18 +576,27 @@ public partial class HasteAP
 
     private static void RemoveTrap(TrapsList traptype)
     {
-        switch (traptype)
+        UnityMainThreadDispatcher.Instance().log($"Attempting to remove trap {traptype}");
+        try
         {
-            case TrapsList.Disaster:
-                FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 0f);
-                ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
-                Player.localPlayer.RemoveItem(DisasterItem);
-                break;
-            case TrapsList.Landing:
-                FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 0f);
-                break;
-            default:
-                break;
+            switch (traptype)
+            {
+                case TrapsList.Disaster:
+                    FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 0f);
+                    ItemInstance DisasterItem = Player.localPlayer.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
+                    Player.localPlayer.RemoveItem(DisasterItem);
+                    break;
+                case TrapsList.Landing:
+                    FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 0f);
+                    break;
+                default:
+                    break;
+            }
+        }
+        catch (Exception e)
+        {
+            UnityMainThreadDispatcher.Instance().log($"Error in removing traps: {e.Message},{e.InnerException},{e.StackTrace}");
+            ApDebugLog.Instance.DisplayMessage($"Error in removing traps:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
         }
     }
 
@@ -605,6 +619,7 @@ public partial class HasteAP
     public static void GenerateRandomStartingItems(Rarity rarity, APItemCategory category, float q)
     {
         if (q == 0f) { return; }
+        UnityMainThreadDispatcher.Instance().log($"Attempting to generate {q} {rarity} {category}");
         List<ItemInstance> itemlist = [];
         List<string> referenceTable = [];
         switch (category)
@@ -711,24 +726,32 @@ public partial class HasteAP
 
                 for (int j = 0; j < 3; j++)
                 {
-                    ItemInstance? itemInstance2 = null;
+                    ItemInstance? itemToAddToShop = null;
                     System.Random random = new System.Random();
                     //TODO: determine if there are no AP items left in that region, then make it spawn a normal item instead
                     // unless the inX is 100, then just let them keep getting useless items I guess (maybe another dummy item)
                     int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
                     if (random.Next(1, 100) <= inX)
                     {
-                        itemInstance2 = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList()[0];
+                        var ItemsThatShouldBeAPShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList();
+                        if (ItemsThatShouldBeAPShop.Count > 0)
+                        {
+                            itemToAddToShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList()[0];
+                        }
+                        else
+                        {
+                            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not find APShopItem in ItemDatabase, wtf is happening here.");
+                        }
                     }
                     else
                     {
-                        itemInstance2 = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
+                        itemToAddToShop = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
                     }
-                    if (itemInstance2 != null)
+                    if (itemToAddToShop != null)
                     {
                         // normal items
-                        if (itemInstance2.itemName != "ArchipelagoShopItem") excludedList.Add(itemInstance2);
-                        self.itemInstances.Add(itemInstance2);
+                        if (itemToAddToShop.itemName != "ArchipelagoShopItem") excludedList.Add(itemToAddToShop);
+                        self.itemInstances.Add(itemToAddToShop);
                     }
                 }
             }
