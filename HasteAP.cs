@@ -1203,8 +1203,7 @@ public partial class HasteAP
                 connection.SendHintedLocation($"{GetAbilityName(abilityName)} Purchase");
             }
         }
-        // almost certainly i'm gonna need to adjust this for the non-check NPCs
-        if (!connection!.IsLocationChecked($"{GetAbilityName(abilityName)} Purchase")) orig(self);
+        if (!connection!.IsLocationChecked($"{GetAbilityName(abilityName)} Purchase") || self.character.name == "Captain") orig(self);
     }
 
 
@@ -1248,7 +1247,7 @@ public partial class HasteAP
         string thedump = FactSystem.GetSerializedFacts().Aggregate("", (current, fact) => current + $"{fact.Key} :: {fact.Value}\n");
         // dumps into haste directory on steam
         File.WriteAllText($"JacobAskedOn_{DateTime.Now:MM-dd-yyyy_hh-mm-ss}.txt", thedump, new UTF8Encoding());
-        UnityMainThreadDispatcher.Instance().logError($"Savedata information has been saved to your Haste directory. Go send that file to Jacob, who asked for this.\nTo find this directory go to Haste in your Steam Library, Right Click -> Manage -> Browse Local Files");
+        UnityMainThreadDispatcher.Instance().log($"Savedata information has been saved to your Haste directory. Go send that file to Jacob, who asked for this.\nTo find this directory go to Haste in your Steam Library, Right Click -> Manage -> Browse Local Files");
     }
 
     //[ConsoleCommand]
