@@ -40,6 +40,8 @@ namespace Integration
             bool worthMentioning = false;
             int? quantity = null;
             NotificationType type = NotificationType.Progression;
+            
+            // TODO: figure out a better way of handling calling Vanilla functions from this code, because they may not be hooked in time when called from an async
 
             try
             {
@@ -66,28 +68,28 @@ namespace Integration
                     case "Wraith's Hourglass":
                         UnityMainThreadDispatcher.Instance().log("AP Got Ability Slomo");
                         ApDebugLog.Instance.DisplayMessage("Got Wraith's Hourglass");
-                        MetaProgression.Unlock(AbilityKind.Slomo);
+                        HasteAP.SecretAbilityUnlock(AbilityKind.Slomo);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Heir's Javelin":
                         UnityMainThreadDispatcher.Instance().log("AP Got Ability Grapple");
                         ApDebugLog.Instance.DisplayMessage("Got Heir's Javelin");
-                        MetaProgression.Unlock(AbilityKind.Grapple);
+                        HasteAP.SecretAbilityUnlock(AbilityKind.Grapple);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Sage's Cowl":
                         UnityMainThreadDispatcher.Instance().log("AP Got Ability Fly");
                         ApDebugLog.Instance.DisplayMessage("Got Sage's Cowl");
-                        MetaProgression.Unlock(AbilityKind.Fly);
+                        HasteAP.SecretAbilityUnlock(AbilityKind.Fly);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Courier's Board":
                         UnityMainThreadDispatcher.Instance().log("AP Got Ability Boost");
                         ApDebugLog.Instance.DisplayMessage("Got Courier's Board");
-                        MetaProgression.Unlock(AbilityKind.BoardBoost);
+                        HasteAP.SecretAbilityUnlock(AbilityKind.BoardBoost);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;

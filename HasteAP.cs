@@ -323,9 +323,15 @@ public partial class HasteAP
 
     private static void StaticOnEnergyGain(On.PlayerCharacter.orig_AddEnergy orig, PlayerCharacter self, float added, EffectSource source)
     {
+        // ideally, these just permanently keep the energy at 0 unless you have an ability
         if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
         {
-            // ideally, these just permanently keep the energy at 0 unless you have an ability
+            // backup function to unbork some things
+            if (!MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && !MetaProgression.IsUnlocked(AbilityKind.Fly) &&
+                !MetaProgression.IsUnlocked(AbilityKind.Grapple) &&
+                !MetaProgression.IsUnlocked(AbilityKind.Slomo)) return;
+            FactSystem.SetFact(new Fact("APNoAbility"), 0f);
+            orig(self, added, source);
         } else
         {
             orig(self, added, source);
@@ -334,9 +340,15 @@ public partial class HasteAP
 
     private static void StaticOnSetEnergy(On.Player.orig_SetEnergy orig, Player self, float amount)
     {
+        // ideally, these just permanently keep the energy at 0 unless you have an ability
         if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
         {
-            // ideally, these just permanently keep the energy at 0 unless you have an ability
+            // backup function to unbork some things
+            if (!MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && !MetaProgression.IsUnlocked(AbilityKind.Fly) &&
+                !MetaProgression.IsUnlocked(AbilityKind.Grapple) &&
+                !MetaProgression.IsUnlocked(AbilityKind.Slomo)) return;
+            FactSystem.SetFact(new Fact("APNoAbility"), 0f);
+            orig(self, amount);
         }
         else
         {
@@ -1037,6 +1049,12 @@ public partial class HasteAP
     }
 
     private static void StaticMetaProgressionUnlockHook(On.Landfall.Haste.MetaProgression.orig_Unlock orig, AbilityKind abilityKind)
+    {
+        // this is so the mod hook can still call this function, but the Integration file can call the """Secret""" function before the hooks are set up
+        SecretAbilityUnlock(abilityKind);
+    }
+
+    public static void SecretAbilityUnlock(AbilityKind abilityKind)
     {
         if (FactSystem.GetFact(new Fact("APNoAbility")) == 1f)
         {
