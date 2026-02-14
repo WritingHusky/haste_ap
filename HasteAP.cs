@@ -385,7 +385,7 @@ public partial class HasteAP
 
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
-        if (FactSystem.GetFact(new Fact("APDeathSendMode")) == (float)SendDeathLinkMode.OnDeath)
+        if (FactSystem.GetFact(new Fact("APDeathSendMode")) == (float)DeathLinkMode.OnDeath)
         {
             connection!.SendDeath();
         }
@@ -453,7 +453,7 @@ public partial class HasteAP
         }
         ApDebugLog.Instance.DisplayMessage("Run Complete");
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f &&
-            FactSystem.GetFact(new Fact("APDeathSendMode")) == (float) SendDeathLinkMode.OnShardFail &&
+            FactSystem.GetFact(new Fact("APDeathSendMode")) == (float) DeathLinkMode.OnShardFail &&
             state is RunHandler.LastRunState.Lose or RunHandler.LastRunState.LoseBad)
         {
             ApDebugLog.Instance.DisplayMessage("Shard Failed with state "+state);
@@ -1490,15 +1490,15 @@ public class ApPasswordSetting : StringSetting, IExposedSetting
 }
 
 [HasteSetting]
-public class ApDeathModeSetting : EnumSetting<SendDeathLinkMode>, IExposedSetting
+public class ApSendDeathModeSetting : EnumSetting<DeathLinkMode>, IExposedSetting
 {
     public override void ApplyValue()
     {
-        UnityMainThreadDispatcher.Instance().log($"AP Toggled Deathlink Mode to {Value}");
+        UnityMainThreadDispatcher.Instance().log($"AP Toggled Deathlink Send Mode to {Value}");
         FactSystem.SetFact(new Fact("APDeathSendMode"), (float)Value);
     }
 
-    protected override SendDeathLinkMode GetDefaultValue() => SendDeathLinkMode.OnDeath;
+    protected override DeathLinkMode GetDefaultValue() => DeathLinkMode.OnDeath;
     public override List<LocalizedString> GetLocalizedChoices() => [
         new UnlocalizedString("Shard Fail"), 
         new UnlocalizedString("Death"), 
@@ -1507,7 +1507,24 @@ public class ApDeathModeSetting : EnumSetting<SendDeathLinkMode>, IExposedSettin
     public string GetCategory() => "AP";
 }
 
-public enum SendDeathLinkMode
+[HasteSetting]
+public class ApReceiveDeathModeSetting : EnumSetting<DeathLinkMode>, IExposedSetting
+{
+    public override void ApplyValue()
+    {
+        UnityMainThreadDispatcher.Instance().log($"AP Toggled Deathlink Receive Mode to {Value}");
+        FactSystem.SetFact(new Fact("APDeathReceiveMode"), (float)Value);
+    }
+
+    protected override DeathLinkMode GetDefaultValue() => DeathLinkMode.OnDeath;
+    public override List<LocalizedString> GetLocalizedChoices() => [
+        new UnlocalizedString("Shard Fail"), 
+        new UnlocalizedString("Death"), 
+    ];
+    public LocalizedString GetDisplayName() => new UnlocalizedString("How to Receive Deathlinks");
+    public string GetCategory() => "AP";
+}
+public enum DeathLinkMode
 {
     OnShardFail, OnDeath
 }

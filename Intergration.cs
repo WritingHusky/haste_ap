@@ -431,7 +431,15 @@ namespace Integration
             }
             UnityMainThreadDispatcher.Instance().log("AP Lets try to Kill the player!");
             FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
-            GM_Run.instance.FallOut(PlayerCharacter.localPlayer);
+            if (FactSystem.GetFact(new Fact("APDeathReceiveMode")) == (float)DeathLinkMode.OnDeath)
+            {
+                GM_Run.instance.FallOut(PlayerCharacter.localPlayer);
+            }
+            else
+            {
+                RunHandler.LoseRun();
+            }
+
         }
 
         // Sets NPCs in overworld
