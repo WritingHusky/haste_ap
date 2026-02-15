@@ -472,6 +472,20 @@ public class Connection(string hostname, int port)
         return true;
     }
 
+    public void SendDeath()
+    {        
+        UnityMainThreadDispatcher.Instance().log("AP Player death Hooked");
+        if (FactSystem.GetFact(new Fact("APDoubleKillStopper")) == 1f)
+        {
+            // this kill came from deathlink, so just kill the player but avoid the re-sending of another deathlink
+            FactSystem.SetFact(new Fact("APDoubleKillStopper"), 0f);
+            return;
+        }
+        ApDebugLog.Instance.DisplayMessage("Death Link sent");
+        deathLinkService!.SendDeathLink(new DeathLink(username));
+        
+    }
+
     public void SendLocation(string locationName)
     {
         UnityMainThreadDispatcher.Instance().log($"AP Sending location {locationName}");
