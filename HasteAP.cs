@@ -385,6 +385,7 @@ public partial class HasteAP
 
     private static void StaticSendDeathOnDie(On.Player.orig_Die orig, Player self)
     {
+        UnityMainThreadDispatcher.Instance().log("AP Player death Hooked");
         if (FactSystem.GetFact(new Fact("APDeathSendMode")) == (float)DeathLinkMode.OnDeath)
         {
             connection!.SendDeath();
@@ -461,7 +462,7 @@ public partial class HasteAP
         }
 
         UpdateShardCount();
-        orig(state);
+        // orig(state);
     }
 
     /// <summary>

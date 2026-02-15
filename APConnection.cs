@@ -460,11 +460,14 @@ public class Connection(string hostname, int port)
 
 
 
-        // get the AP Debug Log settings.
+        // get the AP Debug Log and Deathlink preference settings.
         // normally this value gets set when you toggle the settings from the menu, however the initial value from previous sessions needs to be loaded manually at the start for it to take effect
         var settingsHandler = GameHandler.Instance.SettingsHandler;
         FactSystem.SetFact(new Fact("APDebugLogEnabled"), settingsHandler.GetSetting<ApDebugEnabledSetting>().Value ? 1f : 0f);
         FactSystem.SetFact(new Fact("APMessageFilter"), (float)settingsHandler.GetSetting<ApLogFilter>().Value);
+        
+        FactSystem.SetFact(new Fact("APDeathSendMode"), (float)settingsHandler.GetSetting<ApSendDeathModeSetting>().Value);
+        FactSystem.SetFact(new Fact("APDeathReceiveMode"), (float)settingsHandler.GetSetting<ApReceiveDeathModeSetting>().Value);
 
 
         SaveSystem.Save();
@@ -473,8 +476,7 @@ public class Connection(string hostname, int port)
     }
 
     public void SendDeath()
-    {        
-        UnityMainThreadDispatcher.Instance().log("AP Player death Hooked");
+    {
         if (FactSystem.GetFact(new Fact("APDoubleKillStopper")) == 1f)
         {
             // this kill came from deathlink, so just kill the player but avoid the re-sending of another deathlink
