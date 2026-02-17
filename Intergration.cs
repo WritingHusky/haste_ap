@@ -430,7 +430,12 @@ namespace Integration
                 cause = death.Cause;
             }
             UnityMainThreadDispatcher.Instance().log("AP Lets try to Kill the player!");
-            FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
+            
+            if (FactSystem.GetFact(new Fact("APDeathSendMode"))==FactSystem.GetFact(new Fact("APDeathReceiveMode"))) {
+                // Only enable the doublekill stopper if receiving this death would send a new one.
+                FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
+            }
+            
             if (FactSystem.GetFact(new Fact("APDeathReceiveMode")) == (float)DeathLinkMode.OnDeath)
             {
                 GM_Run.instance.FallOut(PlayerCharacter.localPlayer);
