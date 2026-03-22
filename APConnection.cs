@@ -572,12 +572,15 @@ public class Connection(string hostname, int port)
 
                 if (receivedItemsHelper.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
                 {
+                    UnityMainThreadDispatcher.Instance().log($"AP Item {itemReceivedInfo.ItemName} has index {receivedItemsHelper.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
+                    ApDebugLog.Instance.DisplayMessage($"AP Item {itemReceivedInfo.ItemName} has index {receivedItemsHelper.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
                     return;
                 }
 
-                UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName}");
+                UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {receivedItemsHelper.Index}");
                 ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {receivedItemsHelper.Index}");
                 GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
+                //AddToFact(new Fact("APExpectedIndex"), 1);
                 FactSystem.SetFact(new Fact("APExpectedIndex"), receivedItemsHelper.Index);
                 SaveSystem.Save();
 

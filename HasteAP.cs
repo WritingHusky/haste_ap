@@ -83,7 +83,7 @@ public partial class HasteAP
             password = null;
         }
 
-        connection = new(serverName, serverPort);
+        connection = new Connection(serverName, serverPort);
 
         // This must go BEFORE connection
         connection.BuildItemReciver(GiveItem);
@@ -94,36 +94,45 @@ public partial class HasteAP
             ApDebugLog.Instance.DisplayMessage("Connection Failed");
             return;
         }
-        if (FactSystem.GetFact(new Fact("APVersionMiddle")) > 3f)
+
+        try
         {
-            // takes only the first 8 chars for the seed because floats only store so much and surely this is enough to stop conflicts
-            float seedpart = Convert.ToSingle(connection.session.RoomState.Seed[..8]);
-            if (FactSystem.GetFact(new Fact("APFirstLoad")) > 0f)
+            if (FactSystem.GetFact(new Fact("APVersionMiddle")) > 3f)
             {
-                if (FactSystem.GetFact(new Fact("APRoomSeed")) == 0f)
+                // takes only the first 8 chars for the seed because floats only store so much and surely this is enough to stop conflicts
+                float seedpart = Convert.ToSingle(connection.session.RoomState.Seed[..8]);
+                if (FactSystem.GetFact(new Fact("APFirstLoad")) > 0f)
                 {
-                    // set. it shouldnt get to this part but idk man
+                    if (FactSystem.GetFact(new Fact("APRoomSeed")) == 0f)
+                    {
+                        // set. it shouldnt get to this part but idk man
+                        FactSystem.SetFact(new Fact("APRoomSeed"), seedpart);
+                    }
+                    else
+                    {
+                        // compare
+                        if (FactSystem.GetFact(new Fact("APRoomSeed")) != seedpart)
+                        {
+                            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The seed of the Archipelago room ({seedpart}) does not match the seed stored in the save data ({FactSystem.GetFact(new Fact("APRoomSeed"))}).\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f);
+                            connection.Close();
+                            connection = null;
+                            return;
+                        }
+                        
+                    }
+
+                } else
+                {
+                    // set
                     FactSystem.SetFact(new Fact("APRoomSeed"), seedpart);
                 }
-                else
-                {
-                    // compare
-                    if (FactSystem.GetFact(new Fact("APRoomSeed")) != seedpart)
-                    {
-                        ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The seed of the Archipelago room ({seedpart}) does not match the seed stored in the save data ({FactSystem.GetFact(new Fact("APRoomSeed"))}).\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f);
-                        connection.Close();
-                        connection = null;
-                        return;
-                    }
-                    
-                }
 
-            } else
-            {
-                // set
-                FactSystem.SetFact(new Fact("APRoomSeed"), seedpart);
             }
 
+        }
+        catch (Exception e)
+        {
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not get or convert the AP room seed ({connection?.session.RoomState.Seed}) and cannot perform AP savedata verification.\nThe game will continue, but be very careful that you are playing on the correct savefile when playing with this AP host.", isDebug: false, duration: 20f);
         }
         ApDebugLog.Instance.DisplayMessage("Connected");
 
@@ -610,7 +619,7 @@ public partial class HasteAP
             {
                 case TrapsList.Disaster:
                     FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 0f);
-                    ItemInstance DisasterItem = Player.localPlayer.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
+                    ItemInstance? DisasterItem = Player.localPlayer.items.First(x => x.itemName == "MinorItem_Ascension_Level1");
                     Player.localPlayer.RemoveItem(DisasterItem);
                     break;
                 case TrapsList.Landing:
@@ -622,8 +631,8 @@ public partial class HasteAP
         }
         catch (Exception e)
         {
-            UnityMainThreadDispatcher.Instance().log($"Error in removing traps: {e.Message},{e.InnerException},{e.StackTrace}");
-            ApDebugLog.Instance.DisplayMessage($"Error in removing traps:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
+            UnityMainThreadDispatcher.Instance().log($"Error in removing {traptype} traps: {e.Message},{e.InnerException},{e.StackTrace}");
+            ApDebugLog.Instance.DisplayMessage($"\nError in removing {traptype} traps:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
         }
     }
 
@@ -767,7 +776,7 @@ public partial class HasteAP
                         }
                         else
                         {
-                            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not find APShopItem in ItemDatabase, wtf is happening here.");
+                            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not find APShopItem in ItemDatabase, wtf is happening here.", isDebug:false);
                         }
                     }
                     else
@@ -785,7 +794,7 @@ public partial class HasteAP
             catch (Exception e)
             {
                 UnityMainThreadDispatcher.Instance().log($"Error in generating shop items {e.Message},{e.InnerException},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"Error in generating shop items:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
+                ApDebugLog.Instance.DisplayMessage($"\nError in generating shop items:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
             }
 
             
@@ -1080,7 +1089,7 @@ public partial class HasteAP
                 FactSystem.SetFact(MetaProgression.FlyUnlocked, 1f);
                 break;
             default:
-                throw new ArgumentOutOfRangeException("abilityKind", abilityKind, null);
+                throw new ArgumentOutOfRangeException(nameof(abilityKind), abilityKind, null);
         }
         if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
         {
