@@ -82,6 +82,8 @@ public partial class HasteAP
         {
             password = null;
         }
+        
+        FactSystem.SetFact(new Fact("APSafelyInHub"), 0f);
 
         connection = new Connection(serverName, serverPort);
 
@@ -225,7 +227,9 @@ public partial class HasteAP
 
         // Once the player starts in game do the loading as somethings are not setup yet
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
-
+        
+        connection.SetTimer();
+        
         UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
         ApDebugLog.Instance.DisplayMessage("Loading normally now");
         orig();
@@ -278,6 +282,7 @@ public partial class HasteAP
         FactSystem.UnsubscribeFromFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
         UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
         ApDebugLog.Instance.DisplayMessage("AP Hooks Removed");
+        connection.CloseTimer();
     }
 
     private static void UnbeatedShardHandler(float value)
@@ -418,6 +423,7 @@ public partial class HasteAP
     {
         UnityMainThreadDispatcher.Instance().log("AP Loading into Hub");
         ApDebugLog.Instance.DisplayMessage("Loaded into hub");
+        FactSystem.SetFact(new Fact("APSafelyInHub"), 1f);
 
         UpdateShardCount();
         SetHubState();
@@ -649,6 +655,7 @@ public partial class HasteAP
         GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Support, FactSystem.GetFact(new Fact("APEpicSupportItems")));
         GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Health, FactSystem.GetFact(new Fact("APEpicHealthItems")));
         GenerateRandomStartingItems(Rarity.Legendary, APItemCategory.Legendary, FactSystem.GetFact(new Fact("APLegendaryItems")));
+        FactSystem.SetFact(new Fact("APSafelyInHub"), 0f);
         orig();
     }
 
@@ -1019,7 +1026,7 @@ public partial class HasteAP
             }
             else
             {
-                ApDebugLog.Instance.DisplayMessage(string.Format("Error: could not get next level for {0} (currernt level = {1}). This shouldn't happen due to checks above.", self._entry.fact, self._entry.CurrentLevel));
+                ApDebugLog.Instance.DisplayMessage($"Error: could not get next level for {self._entry.fact} (currernt level = {self._entry.CurrentLevel}). This shouldn't happen due to checks above.");
             }
             FactSystem.AddToFact(MetaProgression.MetaProgressionResource, (float)(-(float)item));
             SaveSystem.Save();

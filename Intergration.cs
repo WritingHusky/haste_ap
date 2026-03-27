@@ -371,11 +371,6 @@ namespace Integration
             }
         }
 
-        public static void AbilityTutorial()
-        {
-            Singleton<TutorialPopUpHandler>.Instance.TriggerPopUp(TutorialType.Abilities);
-        }
-
         [ConsoleCommand]
         public static void ForceItemPopup()
         {

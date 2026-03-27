@@ -6,6 +6,7 @@ using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
 using UnityEngine.Purchasing.MiniJSON;
 using Zorro.Settings;
+using Timer = System.Timers.Timer;
 
 namespace APConnection;
 
@@ -20,6 +21,10 @@ public class Connection(string hostname, int port)
     public string username = "";
 
     public DeathLinkService? deathLinkService;
+
+    private bool HoldingSomething = false;
+    public bool SafelyLoadedInHub = false;
+    private static System.Timers.Timer itemTimer;
 
     public bool Connect(string user = "Player1", string? pass = null, Version? modVersion = null)
     {
@@ -362,7 +367,8 @@ public class Connection(string hostname, int port)
                     switch (Convert.ToSingle(StartingAbility))
                     {
                         case 1f:
-                            MetaProgression.Unlock(AbilityKind.BoardBoost);
+                            // the new unlock function (that handles board) isnt set by this point so i gotta set the fact manually here lmao
+                            FactSystem.SetFact(new Fact("APBoostUnlocked"), 1f);
                             break;
                         case 2f:
                             MetaProgression.Unlock(AbilityKind.Slomo);
@@ -381,6 +387,8 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get StartingAbility from slot data:" + loginSuccess.SlotData.toJson());
+            // just in case
+            FactSystem.SetFact(new Fact("APBoostUnlocked"), 1f);
         }
 
         if (loginSuccess.SlotData.TryGetValue("Persistent Items", out object PermItems))
@@ -545,14 +553,14 @@ public class Connection(string hostname, int port)
         UnityMainThreadDispatcher.Instance().log("AP Disconnected");
         ApDebugLog.Instance.DisplayMessage($"AP Disconnected", isDebug:false);
     }
-
+    
     public void BuildItemReciver(Action<string, string> GiveItem)
     {
 
         UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
         ApDebugLog.Instance.DisplayMessage($"Built item reciever");
 
-        session.Items.ItemReceived += (receivedItemsHelper) =>
+        session.Items.ItemReceived += (_) =>
         {
             try
             {
@@ -566,36 +574,50 @@ public class Connection(string hostname, int port)
                 ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
             }
 
-            try
+            if (IsItSafe() && !HoldingSomething)
             {
-                var itemReceivedInfo = receivedItemsHelper.DequeueItem();
-
-                if (receivedItemsHelper.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
-                {
-                    UnityMainThreadDispatcher.Instance().log($"AP Item {itemReceivedInfo.ItemName} has index {receivedItemsHelper.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
-                    ApDebugLog.Instance.DisplayMessage($"AP Item {itemReceivedInfo.ItemName} has index {receivedItemsHelper.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
-                    return;
-                }
-
-                UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {receivedItemsHelper.Index}");
-                ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {receivedItemsHelper.Index}");
-                GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
-                //AddToFact(new Fact("APExpectedIndex"), 1);
-                FactSystem.SetFact(new Fact("APExpectedIndex"), receivedItemsHelper.Index);
-                SaveSystem.Save();
-
-
-
+                UnityMainThreadDispatcher.Instance().log($"Item received and safe to go.");
+                ProcessItem();
             }
-            catch (Exception e)
+            else
             {
-                if (e.GetType() != typeof(NullReferenceException))
-                {
-                    UnityMainThreadDispatcher.Instance().log($"Error in giving item {e.Message},{e.StackTrace}");
-                    ApDebugLog.Instance.DisplayMessage($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f);
-                }
+                HoldingSomething = true;
             }
+            
         };
+    }
+
+    private void ProcessItem()
+    {
+        try
+        {
+            var itemReceivedInfo = session.Items.DequeueItem();
+
+            if (session.Items.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
+            {
+                UnityMainThreadDispatcher.Instance().log($"AP Item {itemReceivedInfo.ItemName} has index {session.Items.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
+                ApDebugLog.Instance.DisplayMessage($"AP Item {itemReceivedInfo.ItemName} has index {session.Items.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
+                return;
+            }
+
+            UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {session.Items.Index}");
+            ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {session.Items.Index}");
+            Integration.Integration.GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
+            //AddToFact(new Fact("APExpectedIndex"), 1);
+            FactSystem.SetFact(new Fact("APExpectedIndex"), session.Items.Index);
+            SaveSystem.Save();
+
+
+
+        }
+        catch (Exception e)
+        {
+            if (e.GetType() != typeof(NullReferenceException))
+            {
+                UnityMainThreadDispatcher.Instance().log($"Error in giving item {e.Message},{e.StackTrace}");
+                ApDebugLog.Instance.DisplayMessage($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f);
+            }
+        }
     }
 
     public void SendTaglinkPacket(int currentAbility)
@@ -645,4 +667,71 @@ public class Connection(string hostname, int port)
     {
         return session.Locations.AllLocationsChecked.Contains(session.Locations.GetLocationIdFromName(game, location));
     }
+    
+    
+    public bool IsItSafe()
+    {
+        // NOT loading/looking at any other UI screen
+        if (RunHandler.InRun && RunHandler.RunData.currentNodeStatus != NGOPlayer.PlayerNodeStatus.Running)
+        {
+            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: In Run and Loading");
+            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: In Run and Loading");
+            return false;
+        }
+
+        // loading
+        if (UI_TransitionHandler.IsTransitioning)
+        {
+            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Is Transitioning");
+            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Is Transitioning");
+            return false;
+        }
+
+        // any UI screen is open
+        if (!HasteInputSystem.CanTakeInput())
+        {
+            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Player lacks control");
+            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Player lacks control");
+            return false;
+        }
+        
+        // in hub and can actually move
+        if (FactSystem.GetFact(new Fact("in_run")) == 0f)
+        {
+            if (FactSystem.GetFact(new Fact("APSafelyInHub")) == 0f)
+            {
+                UnityMainThreadDispatcher.Instance().log($"Safety Check Fail: Hub not done yet {FactSystem.GetFact(new Fact("in_run"))} {FactSystem.GetFact(new Fact("APSafelyInHub"))}");
+                ApDebugLog.Instance.DisplayMessage($"Safety Check Fail: Hub not done yet {FactSystem.GetFact(new Fact("in_run"))} {FactSystem.GetFact(new Fact("APSafelyInHub"))}");
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public void SetTimer()
+    {
+        UnityMainThreadDispatcher.Instance().log("AP Starting ItemTimer");
+        itemTimer = new Timer(1000);
+        itemTimer.Elapsed += (sender, args) =>
+        {
+            if (session.Items.Any() && HoldingSomething && IsItSafe())
+            {
+                while (HoldingSomething)
+                {
+                    ProcessItem();
+                    HoldingSomething = session.Items.Any();
+                }
+            }
+        };
+        itemTimer.AutoReset = true;
+        itemTimer.Enabled = true;
+    }
+
+    public void CloseTimer()
+    {
+        UnityMainThreadDispatcher.Instance().log("AP Closing ItemTimer");
+        itemTimer.Enabled = false;
+    }
+
 }
