@@ -1287,6 +1287,50 @@ public partial class HasteAP
         File.WriteAllText($"JacobAskedOn_{DateTime.Now:MM-dd-yyyy_hh-mm-ss}.txt", thedump, new UTF8Encoding());
         UnityMainThreadDispatcher.Instance().log($"Savedata information has been saved to your Haste directory. Go send that file to Jacob, who asked for this.\nTo find this directory go to Haste in your Steam Library, Right Click -> Manage -> Browse Local Files");
     }
+    
+    [ConsoleCommand]
+    public static void RecalibrateItems()
+    {
+        if (connection == null)
+            return;
+        
+        // abilities
+        if (connection.GetItemCount("Wraith's Hourglass") > 0) SecretAbilityUnlock(AbilityKind.Slomo);
+        if (connection.GetItemCount("Heir's Javelin") > 0) SecretAbilityUnlock(AbilityKind.Grapple);
+        if (connection.GetItemCount("Sage's Cowl") > 0) SecretAbilityUnlock(AbilityKind.Fly);
+        if (connection.GetItemCount("Courier's Board") > 0) SecretAbilityUnlock(AbilityKind.BoardBoost);
+        
+        // hub NPCs
+        if (connection.GetItemCount("Wraith") > 0) FactSystem.SetFact(new Fact("APWraithInHub"), 1);
+        if (connection.GetItemCount("Niada") > 0) FactSystem.SetFact(new Fact("APHeirInHub"), 1);
+        if (connection.GetItemCount("Daro") > 0) FactSystem.SetFact(new Fact("APSageInHub"), 1);
+        if (connection.GetItemCount("The Captain") > 0) FactSystem.SetFact(new Fact("APCaptainInHub"), 1);
+        if (connection.GetItemCount("Fashion Weeboh") > 0) FactSystem.SetFact(new Fact("APFashionInHub"), 1);
+        
+        // upgrades
+        if (connection.GetItemCount("Max Health Upgrade") is var cmh and > 0) FactSystem.SetFact(new Fact("APUpgradeMaxHealth"), cmh);
+        if (connection.GetItemCount("Max Lives Upgrade") is var cml and > 0) FactSystem.SetFact(new Fact("APUpgradeMaxLives"), cml + 1);
+        if (connection.GetItemCount("Max Energy Upgrade") is var cme and > 0) FactSystem.SetFact(new Fact("APUpgradeMaxEnergy"), cme);
+        if (connection.GetItemCount("Sparks in Fragments Upgrade") is var csf and > 0) FactSystem.SetFact(new Fact("APUpgradeLevelSparks"), csf);
+        if (connection.GetItemCount("Item Rarity Upgrade") is var cir and > 0) FactSystem.SetFact(new Fact("APUpgradeItemRarity"), cir);
+        if (connection.GetItemCount("Starting Sparks Upgrade") is var css and > 0) FactSystem.SetFact(new Fact("APUpgradeStartingSparks"), css);
+                
+        // items
+        if (connection.GetItemCount("Progressive Speed Upgrade") is var psu and > 0) FactSystem.SetFact(new Fact("APSpeedUpgradesCollected"), psu);
+        if (connection.GetItemCount("Persistent Common Speed Item") is var pcs and > 0) FactSystem.SetFact(new Fact("APCommonSpeedItems"), pcs);
+        if (connection.GetItemCount("Persistent Common Support Item") is var pcu and > 0) FactSystem.SetFact(new Fact("APCommonSupportItems"), pcu);
+        if (connection.GetItemCount("Persistent Common Health Item") is var pch and > 0) FactSystem.SetFact(new Fact("APCommonHealthItems"), pch);
+        if (connection.GetItemCount("Persistent Rare Speed Item") is var prs and > 0) FactSystem.SetFact(new Fact("APRareSpeedItems"), prs);
+        if (connection.GetItemCount("Persistent Rare Support Item") is var pru and > 0) FactSystem.SetFact(new Fact("APRareSupportItems"), pru);
+        if (connection.GetItemCount("Persistent Rare Health Item") is var prh and > 0) FactSystem.SetFact(new Fact("APRareHealthItems"), prh);        
+        if (connection.GetItemCount("Persistent Epic Speed Item") is var pes and > 0) FactSystem.SetFact(new Fact("APEpicSpeedItems"), pes);
+        if (connection.GetItemCount("Persistent Epic Support Item") is var peu and > 0) FactSystem.SetFact(new Fact("APEpicSupportItems"), peu);
+        if (connection.GetItemCount("Persistent Epic Health Item") is var peh and > 0) FactSystem.SetFact(new Fact("APEpicHealthItems"), peh);
+        if (connection.GetItemCount("Persistent Legendary Item") is var pl and > 0) FactSystem.SetFact(new Fact("APLegendaryItems"), pl);
+        
+        Player.localPlayer.ResetStats();
+        SaveSystem.Save();
+    }
 
     //[ConsoleCommand]
     //public static void DumpItemData()

@@ -2,6 +2,7 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Colors;
 using Archipelago.MultiClient.Net.Enums;
+using Archipelago.MultiClient.Net.Helpers;
 using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
 using UnityEngine.Purchasing.MiniJSON;
@@ -22,9 +23,8 @@ public class Connection(string hostname, int port)
 
     public DeathLinkService? deathLinkService;
 
-    private bool HoldingSomething = false;
-    public bool SafelyLoadedInHub = false;
-    private static System.Timers.Timer itemTimer;
+    private static Timer backgroundTimer;
+    private Queue<Action> actions = new ();
 
     public bool Connect(string user = "Player1", string? pass = null, Version? modVersion = null)
     {
@@ -560,7 +560,7 @@ public class Connection(string hostname, int port)
         UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
         ApDebugLog.Instance.DisplayMessage($"Built item reciever");
 
-        session.Items.ItemReceived += (_) =>
+        session.Items.ItemReceived += (rih) =>
         {
             try
             {
@@ -573,38 +573,41 @@ public class Connection(string hostname, int port)
                 UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
                 ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
             }
-
-            if (IsItSafe() && !HoldingSomething)
+            
+            if (IsItSafe())
             {
-                UnityMainThreadDispatcher.Instance().log($"Item received and safe to go.");
-                ProcessItem();
-            }
-            else
+                int copy = rih.Index;
+                UnityMainThreadDispatcher.Instance().log($"Item received of index {copy} and safe to go.");
+                ProcessItem(rih, copy);
+            } else
             {
-                HoldingSomething = true;
+                // lambda-capture lookin-ass workaround i swear to god
+                int copy = rih.Index;
+                UnityMainThreadDispatcher.Instance().log($"AP Enqueing Item of index {copy} to Actions Queue because its not safe.");
+                ApDebugLog.Instance.DisplayMessage($"AP Enqueing Item of index {copy} to Actions Queue because its not safe.");
+                actions.Enqueue(() => ProcessItem(rih, copy));
             }
             
         };
     }
 
-    private void ProcessItem()
+    private void ProcessItem(ReceivedItemsHelper rih, int index)
     {
         try
         {
-            var itemReceivedInfo = session.Items.DequeueItem();
+            var itemReceivedInfo = rih.DequeueItem();
 
-            if (session.Items.Index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
+            if (index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
             {
-                UnityMainThreadDispatcher.Instance().log($"AP Item {itemReceivedInfo.ItemName} has index {session.Items.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
-                ApDebugLog.Instance.DisplayMessage($"AP Item {itemReceivedInfo.ItemName} has index {session.Items.Index}, which is greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
+                UnityMainThreadDispatcher.Instance().log($"AP Item {itemReceivedInfo.ItemName} has index {index}, which is not greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
+                ApDebugLog.Instance.DisplayMessage($"AP Item {itemReceivedInfo.ItemName} has index {index}, which is not greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
                 return;
             }
 
-            UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {session.Items.Index}");
-            ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {session.Items.Index}");
+            UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {index}");
+            ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {index}");
             Integration.Integration.GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
-            //AddToFact(new Fact("APExpectedIndex"), 1);
-            FactSystem.SetFact(new Fact("APExpectedIndex"), session.Items.Index);
+            FactSystem.AddToFact(new Fact("APExpectedIndex"), 1f);
             SaveSystem.Save();
 
 
@@ -712,26 +715,26 @@ public class Connection(string hostname, int port)
     public void SetTimer()
     {
         UnityMainThreadDispatcher.Instance().log("AP Starting ItemTimer");
-        itemTimer = new Timer(1000);
-        itemTimer.Elapsed += (sender, args) =>
+        backgroundTimer = new Timer(1000);
+        backgroundTimer.Elapsed += (sender, args) =>
         {
-            if (session.Items.Any() && HoldingSomething && IsItSafe())
+            if (session.Items.Any() && actions.Count > 0 && IsItSafe())
             {
-                while (HoldingSomething)
+                while (actions.Count > 0)
                 {
-                    ProcessItem();
-                    HoldingSomething = session.Items.Any();
+                    var ac = actions.Dequeue();
+                    ac.Invoke();
                 }
             }
         };
-        itemTimer.AutoReset = true;
-        itemTimer.Enabled = true;
+        backgroundTimer.AutoReset = true;
+        backgroundTimer.Enabled = true;
     }
 
     public void CloseTimer()
     {
         UnityMainThreadDispatcher.Instance().log("AP Closing ItemTimer");
-        itemTimer.Enabled = false;
+        backgroundTimer.Enabled = false;
     }
 
 }
