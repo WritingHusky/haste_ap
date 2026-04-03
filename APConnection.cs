@@ -5,6 +5,7 @@ using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Helpers;
 using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
+using Landfall.Haste.Music;
 using UnityEngine.Purchasing.MiniJSON;
 using Zorro.Settings;
 using Timer = System.Timers.Timer;
@@ -25,6 +26,7 @@ public class Connection(string hostname, int port)
 
     private static Timer backgroundTimer;
     private Queue<Action> actions = new ();
+    public bool WillNeedToForceReload = false;
 
     public bool Connect(string user = "Player1", string? pass = null, Version? modVersion = null)
     {
@@ -691,7 +693,7 @@ public class Connection(string hostname, int port)
         }
 
         // any UI screen is open
-        if (!HasteInputSystem.CanTakeInput())
+        if (!HasteInputSystem.CanTakeInput() || InteractionHandler.IsPlayingInteraction)
         {
             UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Player lacks control");
             ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Player lacks control");
@@ -707,6 +709,13 @@ public class Connection(string hostname, int port)
                 ApDebugLog.Instance.DisplayMessage($"Safety Check Fail: Hub not done yet {FactSystem.GetFact(new Fact("in_run"))} {FactSystem.GetFact(new Fact("APSafelyInHub"))}");
                 return false;
             }
+        }
+        
+        if (FactSystem.GetFact(new Fact("played_StartGame01")) == 0f)
+        {
+            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Haven't had first conversation with Daro");
+            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Haven't had first conversation with Daro");
+            return false;
         }
 
         return true;
@@ -725,7 +734,9 @@ public class Connection(string hostname, int port)
                     var ac = actions.Dequeue();
                     ac.Invoke();
                 }
+
             }
+            if (WillNeedToForceReload) Integration.Integration.ForceReload();
         };
         backgroundTimer.AutoReset = true;
         backgroundTimer.Enabled = true;

@@ -23,7 +23,6 @@ namespace StoryFlags
             "has_met_animal_fashion",
 
             // Story conversations
-            "played_01_StartGame01",
             "played_04_Main_SecondRun_Heir",
             "played_05_Main_AfterSecondRun",
             "played_06_Main_ThirdRun_Heir",

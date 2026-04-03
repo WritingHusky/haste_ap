@@ -10,6 +10,7 @@ using UnityEngine.Localization;
 using Zorro.Core.CLI;
 using Zorro.Settings;
 using static Integration.Integration;
+using NotificationHandler = On.Landfall.Haste.NotificationHandler;
 
 [LandfallPlugin]
 public partial class HasteAP
@@ -1100,7 +1101,7 @@ public partial class HasteAP
         }
         if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, !connection.WillNeedToForceReload);
         }
     }
 

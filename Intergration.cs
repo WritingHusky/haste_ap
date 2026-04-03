@@ -58,7 +58,7 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Progressive Shard");
                         UpdateShardCount();
-                        ForceReload();
+                        DecideForceReload();
                         break;
                     case "Shard Shop Filler Item":
                         // 80% sure this item can't actually spawn but I'll keep it here anyway
@@ -98,35 +98,35 @@ namespace Integration
                         ApDebugLog.Instance.DisplayMessage("Got Wraith in hub");
                         FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
                         worthMentioning = true;
-                        ForceReload();
+                        DecideForceReload();
                         break;
                     case "Niada":
                         UnityMainThreadDispatcher.Instance().log("AP Got Niada");
                         ApDebugLog.Instance.DisplayMessage("Got Niada in hub");
                         FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
                         worthMentioning = true;
-                        ForceReload();
+                        DecideForceReload();
                         break;
                     case "Daro":
                         UnityMainThreadDispatcher.Instance().log("AP Got Daro");
                         ApDebugLog.Instance.DisplayMessage("Got Daro in hub");
                         FactSystem.SetFact(new Fact("APSageInHub"), 1f);
                         worthMentioning = true;
-                        ForceReload();
+                        DecideForceReload();
                         break;
                     case "The Captain":
                         UnityMainThreadDispatcher.Instance().log("AP Got The Captain");
                         ApDebugLog.Instance.DisplayMessage("Got The Captain");
                         FactSystem.SetFact(new Fact("APCaptainInHub"), 1f);
                         worthMentioning = true;
-                        ForceReload();
+                        DecideForceReload();
                         break;
                     case "Fashion Weeboh":
                         UnityMainThreadDispatcher.Instance().log("AP Got Fashion Weeboh");
                         ApDebugLog.Instance.DisplayMessage("Got Fashion Weeboh");
                         FactSystem.SetFact(new Fact("APFashionInHub"), 1f);
                         worthMentioning = true;
-                        ForceReload();
+                        DecideForceReload();
                         break;
                     case "Progressive Speed Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Progressive Speed Upgrade");
@@ -327,36 +327,20 @@ namespace Integration
             //SaveSystem.Save();
         }
 
+        private static void DecideForceReload()
+        {
+          if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f) connection!.WillNeedToForceReload = true;
+        }
+
         [ConsoleCommand]
         public static void ForceReload()
         {
-            if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f)
+            if (FactSystem.GetFact(new Fact("in_run")) == 0f && FactSystem.GetFact(new Fact("APForceReload")) == 1f && connection.IsItSafe())
             {
+                
+                connection.WillNeedToForceReload = false;
                 UnityMainThreadDispatcher.Instance().log("AP Forcing a Reload");
                 ApDebugLog.Instance.DisplayMessage($"Hub reload has been forced. Hold tight.", isDebug:false);
-                try
-                {
-                    // close UI that might not exist
-                    Type MetaUIType = typeof(MetaProgressionRowUI).Assembly.GetType("Landfall.Haste.MetaProgressionUI");
-                    MethodInfo closeUIInfo = MetaUIType.GetMethod("CloseUI", BindingFlags.Instance | BindingFlags.Public);
-                    object metaUiInstance = GameObject.FindAnyObjectByType(MetaUIType);
-                    closeUIInfo.Invoke(metaUiInstance, null);
-                } catch (Exception) { }
-
-                try
-                {
-                    // close UI that might not exist
-                    Type MetaSkinUIType = typeof(MetaProgressionRowUI).Assembly.GetType("Landfall.Haste.SkinSelectionUI");
-                    MethodInfo closeUIInfo2 = MetaSkinUIType.GetMethod("CloseUI", BindingFlags.Instance | BindingFlags.Public);
-                    object metaSkinUiInstance = GameObject.FindAnyObjectByType(MetaSkinUIType);
-                    closeUIInfo2.Invoke(metaSkinUiInstance, null);
-                }
-                catch (Exception) { }
-
-                // tell the game that the 2 other hub UIs are closed
-                AlltimeStatsScreen.IsOpen = false;
-                UI_UnlockedItemsScreen.IsOpen = false;
-                // see how much easier this is when the class is public and you don't need to go through type reflection?
 
                 TimeHandler.instance.ResetTime();
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
