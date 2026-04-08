@@ -768,19 +768,29 @@ public partial class HasteAP
                     self.Unset(i);
                 }
 
+                var apShopItem = ItemDatabase.instance.items.FirstOrDefault(x => x.itemName == "ArchipelagoShopItem");
+                bool itemUnlocksModeEnabled = FactSystem.GetFact(new Fact("Item Unlocks")) > 0f;
+                List<ItemInstance> acceptableItems = new List<ItemInstance>();
+                // The only acceptable items should be the ones that are AP-unlocked if item unlocks mode is on, otherwise all items are acceptable
+                if (itemUnlocksModeEnabled)
+                {              
+                    // Item Unlocks ON: Only show AP-unlocked items
+                    UnityMainThreadDispatcher.Instance().log($"AP Shop Sanity: Checking {ItemDatabase.instance.items.Count} items in database");
+
+                    acceptableItems = ItemDatabase.instance.items.Where(item => !Integration.Integration.IsItemLocked(GetItemName(item.itemName))).ToList();
+                }
+
+                int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
                 for (int j = 0; j < 3; j++)
                 {
                     ItemInstance? itemToAddToShop = null;
-                    System.Random random = new System.Random();
                     //TODO: determine if there are no AP items left in that region, then make it spawn a normal item instead
                     // unless the inX is 100, then just let them keep getting useless items I guess (maybe another dummy item)
-                    int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
-                    if (random.Next(1, 100) <= inX)
+                    if (currentLevelRandomInstance.Next(1, 100) <= inX)
                     {
-                        var ItemsThatShouldBeAPShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList();
-                        if (ItemsThatShouldBeAPShop.Count > 0)
+                        if (apShopItem != null)
                         {
-                            itemToAddToShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList()[0];
+                            itemToAddToShop = apShopItem;
                         }
                         else
                         {
@@ -789,7 +799,31 @@ public partial class HasteAP
                     }
                     else
                     {
-                        itemToAddToShop = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
+                        if (acceptableItems.Count > 0 || !itemUnlocksModeEnabled)
+                        {
+                            if(itemUnlocksModeEnabled)
+                            {
+                                itemToAddToShop = acceptableItems[currentLevelRandomInstance.Next(acceptableItems.Count)];
+                            }
+                            else 
+                            {
+                                // pre-item-unlocks logic, should be the same as the original shopsanity item generation
+                                itemToAddToShop = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
+                            }
+
+                            for(int p = 0; p < self.itemInstances.Count; p++) {
+                                if (itemToAddToShop != null && self.itemInstances[p] != null && self.itemInstances[p].itemName == itemToAddToShop.itemName)
+                                {
+                                    // if the item is already in the shop, then replace it with an AP shop item instead to avoid duplicates
+                                    // dupes happens a lot early game when item unlocks mode is on, so this added logic is here to hopefully prevent that
+                                    if (apShopItem != null)
+                                    {
+                                        itemToAddToShop = apShopItem;
+                                        UnityMainThreadDispatcher.Instance().log($"No replacement found, using AP shop item for {itemToAddToShop.itemName}");
+                                    }
+                                }
+                            }
+                        }
                     }
                     if (itemToAddToShop != null)
                     {
@@ -1124,6 +1158,7 @@ public partial class HasteAP
 
     private static void StaticMetaProgressionRefreshUIHook(On.Landfall.Haste.MetaProgressionRowUI.orig_RefreshUI orig, MetaProgressionRowUI self)
     {
+        // TODO: With ItemUnlocks mode, the all items list in the hub is inaccurate and needs to be updated to reflect the actual unlocked items through AP
         orig(self);
         if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
         {
