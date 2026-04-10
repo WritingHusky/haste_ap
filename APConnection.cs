@@ -473,6 +473,17 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().log($"AP found Item Unlocks in slot data with value: {ItemUnlocks}");
             FactSystem.SetFact(new Fact("Item Unlocks"), Convert.ToSingle(ItemUnlocks));
+                if (Convert.ToSingle(ItemUnlocks) == 1)
+                {
+                    if(FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+                    {
+                    // lock all items once
+                        ItemDatabase.LockAll();
+                    }
+                    // the game resets the default unlocked items list on every load
+                    ItemDatabase.instance.defaultUnlockedItemsSet.Clear();
+                    ItemDatabase.instance.defaultUnlockedItems.Clear();
+                }
         }
         else
         {

@@ -443,7 +443,8 @@ namespace Integration
             ApDebugLog.Instance.DisplayMessage($"Unlocked: {itemName}");
             
             // Create a fact name to track this unlock (e.g., "APItemUnlock_Adrenaline")
-            string unlockedItemFactName = $"APItemUnlock_{itemName}";
+            string safeItemName = itemName.Replace(" ", "").Replace("'", ""); // Remove spaces and apostrophes for fact naming
+            string unlockedItemFactName = $"APItemUnlock_{safeItemName}";
             FactSystem.SetFact(new Fact(unlockedItemFactName), 1f);
             
             SaveSystem.Save();
@@ -453,14 +454,20 @@ namespace Integration
 
         public static bool IsItemUnlocked(string itemName)
         {
-            string unlockedItemFactName = $"APItemUnlock_{itemName}";
+            string safeItemName = itemName.Replace(" ", "").Replace("'", "");
+            string unlockedItemFactName = $"APItemUnlock_{safeItemName}";
             float factValue = FactSystem.GetFact(new Fact(unlockedItemFactName));
             return factValue > 0f;
         }
 
-        public static bool IsItemLocked(string itemName)
+        public static int APItemUnlockCount()
         {
-            return !IsItemUnlocked(itemName);
+            int count = 0;
+            foreach (string item in ItemUnlocks)
+            {
+                if (IsItemUnlocked(item)) count++;
+            }
+            return count;
         }
 
         private static void DecideForceReload()
