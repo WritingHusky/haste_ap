@@ -2,6 +2,7 @@ using APConnection;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Landfall.Haste;
 using Landfall.Modding;
+using System.ComponentModel.Composition;
 using System.Reflection;
 using System.Text;
 using TMPro;
@@ -222,7 +223,7 @@ public partial class HasteAP
         On.PlayerCharacter.RestartPlayer_Launch_Transform_float += StaticSetSpeed;
         On.PlayerCharacter.RestartPlayer_Still_Transform += StaticSetSpeed;
         On.PlayerMovement.Land += StaticLandingHook;
-
+        On.RunHandler.TransitionOnLevelCompleted += StaticTransitionOnLevelCompleted;
 
         UnityMainThreadDispatcher.Instance().log("AP Hooks Complete");
 
@@ -268,6 +269,7 @@ public partial class HasteAP
         On.PlayerCharacter.RestartPlayer_Launch_Transform_float -= StaticSetSpeed;
         On.PlayerCharacter.RestartPlayer_Still_Transform -= StaticSetSpeed;
         On.PlayerMovement.Land -= StaticLandingHook;
+        On.RunHandler.TransitionOnLevelCompleted -= StaticTransitionOnLevelCompleted;
         On.Landfall.Haste.MetaProgressionRowUI.AddClicked -= StaticMetaProgressionRowAddClickedHook;
         On.Landfall.Haste.MetaProgressionRowUI.RefreshUI -= StaticMetaProgressionRefreshUIHook;
         On.Landfall.Haste.MetaProgression.GetCurrentLevel -= StaticMetaProgressionGetCurrentLevelHook;
@@ -768,19 +770,40 @@ public partial class HasteAP
                     self.Unset(i);
                 }
 
+                var apShopItem = ItemDatabase.instance.items.FirstOrDefault(x => x.itemName == "ArchipelagoShopItem");
+                bool itemUnlocksModeEnabled = FactSystem.GetFact(new Fact("Item Unlocks")) > 0f;
+                List<ItemInstance> acceptableItems = new List<ItemInstance>();
+                // The only acceptable items should be the ones that are AP-unlocked if item unlocks mode is on, otherwise all items are acceptable
+                if (itemUnlocksModeEnabled)
+                {              
+                    // Item Unlocks ON: Only show AP-unlocked items
+                    UnityMainThreadDispatcher.Instance().log($"AP Shop Sanity: Checking {ItemDatabase.instance.items.Count} items in database");
+
+                    acceptableItems = ItemDatabase.instance.items.Where(item => Integration.Integration.IsItemUnlocked(GetItemName(item.itemName))).ToList();
+                }
+
+                bool anyArchipelagoItemsLeft = false;
+                var currentShard = RunHandler.RunData.shardID + 1;
+                int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
                 for (int j = 0; j < 3; j++)
                 {
                     ItemInstance? itemToAddToShop = null;
-                    System.Random random = new System.Random();
                     //TODO: determine if there are no AP items left in that region, then make it spawn a normal item instead
                     // unless the inX is 100, then just let them keep getting useless items I guess (maybe another dummy item)
-                    int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
-                    if (random.Next(1, 100) <= inX)
+                    if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
                     {
-                        var ItemsThatShouldBeAPShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList();
-                        if (ItemsThatShouldBeAPShop.Count > 0)
+                        anyArchipelagoItemsLeft = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) < FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                    }
+                    else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
+                    {
+                        anyArchipelagoItemsLeft = FactSystem.GetFact(new Fact("APShopsanityGlobal")) < FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                    }
+
+                    if (currentLevelRandomInstance.Next(1, 100) <= inX && anyArchipelagoItemsLeft)
+                    {
+                        if (apShopItem != null)
                         {
-                            itemToAddToShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList()[0];
+                            itemToAddToShop = apShopItem;
                         }
                         else
                         {
@@ -789,13 +812,43 @@ public partial class HasteAP
                     }
                     else
                     {
-                        itemToAddToShop = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
+                        if (acceptableItems.Count > 0 || !itemUnlocksModeEnabled)
+                        {
+                            if(itemUnlocksModeEnabled)
+                            {
+                                itemToAddToShop = acceptableItems[currentLevelRandomInstance.Next(acceptableItems.Count)];
+                            }
+                            else 
+                            {
+                                // pre-item-unlocks logic, should be the same as the original shopsanity item generation
+                                itemToAddToShop = self.testItem ? self.testItem : ItemDatabase.GetRandomItem(localPlayer, currentLevelRandomInstance, GetRandomItemFlags.Major, TagInteraction.None, null, excludedList, RunHandler.GetShopItemRarityModifier());
+                            }
+
+                            for(int p = 0; p < self.itemInstances.Count; p++) {
+                                if (itemToAddToShop != null && self.itemInstances[p] != null && self.itemInstances[p].itemName == itemToAddToShop.itemName)
+                                {
+                                    // if the item is already in the shop, then replace it with an AP shop item instead to avoid duplicates
+                                    // dupes happens a lot early game when item unlocks mode is on, so this added logic is here to hopefully prevent that
+                                    if (apShopItem != null)
+                                    {
+                                        itemToAddToShop = apShopItem;
+                                        UnityMainThreadDispatcher.Instance().log($"No replacement found, using AP shop item for {itemToAddToShop.itemName}");
+                                    }
+                                }
+                            }
+                        }
                     }
                     if (itemToAddToShop != null)
                     {
                         // normal items
                         if (itemToAddToShop.itemName != "ArchipelagoShopItem") excludedList.Add(itemToAddToShop);
                         self.itemInstances.Add(itemToAddToShop);
+                    }
+                    else
+                    {
+                        itemToAddToShop = apShopItem;
+                        self.itemInstances.Add(itemToAddToShop);
+                        UnityMainThreadDispatcher.Instance().log($"No item found, using AP shop item for slot {j}");
                     }
                 }
             }
@@ -813,6 +866,17 @@ public partial class HasteAP
         }
     }
 
+    public static void StaticTransitionOnLevelCompleted(On.RunHandler.orig_TransitionOnLevelCompleted orig)
+    {
+        orig();
+        if (RunHandler.RunData.currentNode.type == LevelSelectionNode.NodeType.Challenge && RunHandler.InRun 
+        && RunHandler.RunData.currentNodeStatus == NGOPlayer.PlayerNodeStatus.PostLevelScreen && APItemUnlockCount() < 3)
+        {
+            RunHandler.RunData.currentNodeStatus = NGOPlayer.PlayerNodeStatus.PostLevelScreenComplete;
+            UnityMainThreadDispatcher.Instance().logError($"Set shard status to PostLevelScreenComplete");
+        }
+
+    }
 
     /// <summary>
     /// Hook into when a player buys and item. Used to give item locations
@@ -1124,6 +1188,7 @@ public partial class HasteAP
 
     private static void StaticMetaProgressionRefreshUIHook(On.Landfall.Haste.MetaProgressionRowUI.orig_RefreshUI orig, MetaProgressionRowUI self)
     {
+        // TODO: With ItemUnlocks mode, the all items list in the hub is inaccurate and needs to be updated to reflect the actual unlocked items through AP
         orig(self);
         if (FactSystem.GetFact(new Fact("APCaptainsRewards")) == 1f)
         {
@@ -1328,6 +1393,113 @@ public partial class HasteAP
         if (connection.GetItemCount("Persistent Epic Support Item") is var peu and > 0) FactSystem.SetFact(new Fact("APEpicSupportItems"), peu);
         if (connection.GetItemCount("Persistent Epic Health Item") is var peh and > 0) FactSystem.SetFact(new Fact("APEpicHealthItems"), peh);
         if (connection.GetItemCount("Persistent Legendary Item") is var pl and > 0) FactSystem.SetFact(new Fact("APLegendaryItems"), pl);
+
+        // BOOST ITEMS
+        if (connection.GetItemCount("Blood Engine") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BloodEngine"), 1);
+        if (connection.GetItemCount("Boost Remote") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BoostRemote"), 1);
+        if (connection.GetItemCount("BOOSTR POG") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BOOSTRPOG"), 1);
+        if (connection.GetItemCount("Bootleg Pattern") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BootlegPattern"), 1);
+        if (connection.GetItemCount("Charge Boots") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ChargeBoots"), 1);
+        if (connection.GetItemCount("Cherry on Top") > 0) FactSystem.SetFact(new Fact("APItemUnlock_CherryOnTop"), 1);
+        if (connection.GetItemCount("Energy Lasso") > 0) FactSystem.SetFact(new Fact("APItemUnlock_EnergyLasso"), 1);
+        if (connection.GetItemCount("Experimental Autopilot") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ExperimentalAutopilot"), 1);
+        if (connection.GetItemCount("Experimental Thrusters") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ExperimentalThrusters"), 1);
+        if (connection.GetItemCount("Fragile Confidence") > 0) FactSystem.SetFact(new Fact("APItemUnlock_FragileConfidence"), 1);
+        if (connection.GetItemCount("Golden Necklace") > 0) FactSystem.SetFact(new Fact("APItemUnlock_GoldenNecklace"), 1);
+        if (connection.GetItemCount("Big Spark Magnet") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BigSparkMagnet"), 1);
+        if (connection.GetItemCount("Heir's Determination") > 0) FactSystem.SetFact(new Fact("APItemUnlock_HeirsDetermination"), 1);
+        if (connection.GetItemCount("Mysterious Spring") > 0) FactSystem.SetFact(new Fact("APItemUnlock_MysteriousSpring"), 1);
+        if (connection.GetItemCount("Painful Coil") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PainfulCoil"), 1);
+        if (connection.GetItemCount("Pathfinder") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Pathfinder"), 1);
+        if (connection.GetItemCount("Perpetual Motion Machine") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PerpetualMotionMachine"), 1);
+        if (connection.GetItemCount("Personal Gravity Enhancer") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PersonalGravityEnhancer"), 1);
+        if (connection.GetItemCount("Recyclable Rocket") > 0) FactSystem.SetFact(new Fact("APItemUnlock_RecyclableRocket"), 1);
+        if (connection.GetItemCount("Ring Materializer") > 0) FactSystem.SetFact(new Fact("APItemUnlock_RingMaterializer"), 1);
+        if (connection.GetItemCount("Risk and Reward") > 0) FactSystem.SetFact(new Fact("APItemUnlock_RiskandReward"), 1);
+        if (connection.GetItemCount("Emergency Shoes") > 0) FactSystem.SetFact(new Fact("APItemUnlock_EmergencyShoes"), 1);
+        if (connection.GetItemCount("Greed Machine") > 0) FactSystem.SetFact(new Fact("APItemUnlock_GreedMachine"), 1);
+        if (connection.GetItemCount("Rocket Boots") > 0) FactSystem.SetFact(new Fact("APItemUnlock_RocketBoots"), 1);
+        if (connection.GetItemCount("Secret Technique Instructions") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SecretTechniqueInstructions"), 1);
+        if (connection.GetItemCount("Shiny Anchor Pin") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ShinyAnchorPin"), 1);
+        if (connection.GetItemCount("Shortcut") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Shortcut"), 1);
+        if (connection.GetItemCount("Spark Dasher") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SparkDasher"), 1);
+        if (connection.GetItemCount("Spark Plug") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SparkPlug"), 1);
+        if (connection.GetItemCount("Spark Powered Propeller") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SparkPoweredPropeller"), 1);
+        if (connection.GetItemCount("Standard Redirector") > 0) FactSystem.SetFact(new Fact("APItemUnlock_StandardRedirector"), 1);
+        if (connection.GetItemCount("Time Dilation Thing") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TimeDilationThing"), 1);
+        if (connection.GetItemCount("Timeline Attractor") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TimelineAttractor"), 1);
+        if (connection.GetItemCount("Timeline Shifter") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TimelineShifter"), 1);
+        if (connection.GetItemCount("Transition Slingshot") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TransitionSlingshot"), 1);
+        if (connection.GetItemCount("Vitamins") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Vitamins"), 1);
+        if (connection.GetItemCount("Well Earned Confidence") > 0) FactSystem.SetFact(new Fact("APItemUnlock_WellEarnedConfidence"), 1);
+        if (connection.GetItemCount("Wingspan") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Wingspan"), 1);
+
+
+        // SUPPORT ITEMS
+        if (connection.GetItemCount("400-leaf Clover") > 0) FactSystem.SetFact(new Fact("APItemUnlock_400leafClover"), 1);
+        if (connection.GetItemCount("Adrenaline") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Adrenaline"), 1);
+        if (connection.GetItemCount("Atomic Timepiece") > 0) FactSystem.SetFact(new Fact("APItemUnlock_AtomicTimepiece"), 1);
+        if (connection.GetItemCount("Clown Shoes") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ClownShoes"), 1);
+        if (connection.GetItemCount("Dangerous Investment Scheme") > 0) FactSystem.SetFact(new Fact("APItemUnlock_DangerousInvestmentScheme"), 1);
+        if (connection.GetItemCount("Dynamo Treadmill") > 0) FactSystem.SetFact(new Fact("APItemUnlock_DynamoTreadmill"), 1);
+        if (connection.GetItemCount("Flashback") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Flashback"), 1);
+        if (connection.GetItemCount("General Relativity") > 0) FactSystem.SetFact(new Fact("APItemUnlock_GeneralRelativity"), 1);
+        if (connection.GetItemCount("Heart Shaped Mirror") > 0) FactSystem.SetFact(new Fact("APItemUnlock_HeartShapedMirror"), 1);
+        if (connection.GetItemCount("High Risk Investment") > 0) FactSystem.SetFact(new Fact("APItemUnlock_HighRiskInvestment"), 1);
+        if (connection.GetItemCount("Instant Compensation Machine") > 0) FactSystem.SetFact(new Fact("APItemUnlock_InstantCompensationMachine"), 1);
+        if (connection.GetItemCount("Interest") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Interest"), 1);
+        if (connection.GetItemCount("Jackpot") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Jackpot"), 1);
+        if (connection.GetItemCount("Karma") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Karma"), 1);
+        if (connection.GetItemCount("Momentum Recalibrator") > 0) FactSystem.SetFact(new Fact("APItemUnlock_MomentumRecalibrator"), 1);
+        if (connection.GetItemCount("N-Dimensional-leaf Clover") > 0) FactSystem.SetFact(new Fact("APItemUnlock_NDimensionalleafClover"), 1);
+        if (connection.GetItemCount("Overcomplicated Coin") > 0) FactSystem.SetFact(new Fact("APItemUnlock_OvercomplicatedCoin"), 1);
+        if (connection.GetItemCount("Overwound Pocketwatch") > 0) FactSystem.SetFact(new Fact("APItemUnlock_OverwoundPocketwatch"), 1);
+        if (connection.GetItemCount("Planar Reconfiguration") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PlanarReconfiguration"), 1);
+        if (connection.GetItemCount("Plutonium Coin") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PlutoniumCoin"), 1);
+        if (connection.GetItemCount("Portable Harvester") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PortableHarvester"), 1);
+        if (connection.GetItemCount("Shimmering Condenser") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ShimmeringCondenser"), 1);
+        if (connection.GetItemCount("Spark Furnace") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SparkFurnace"), 1);
+        if (connection.GetItemCount("Steady Investment") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SteadyInvestment"), 1);
+        if (connection.GetItemCount("Tight Schedule") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TightSchedule"), 1);
+        if (connection.GetItemCount("Timeline Recalibrator") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TimelineRecalibrator"), 1);
+        if (connection.GetItemCount("Void Charger") > 0) FactSystem.SetFact(new Fact("APItemUnlock_VoidCharger"), 1);
+        if (connection.GetItemCount("Void Compressor") > 0) FactSystem.SetFact(new Fact("APItemUnlock_VoidCompressor"), 1);
+
+
+        // HEALTH ITEMS
+        if (connection.GetItemCount("Aromatic Herbs") > 0) FactSystem.SetFact(new Fact("APItemUnlock_AromaticHerbs"), 1);
+        if (connection.GetItemCount("Big Pumpkin") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BigPumpkin"), 1);
+        if (connection.GetItemCount("Big Squash") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BigSquash"), 1);
+        if (connection.GetItemCount("Bitter Herbs") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BitterHerbs"), 1);
+        if (connection.GetItemCount("Brittle Breastplate") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BrittleBreastplate"), 1);
+        if (connection.GetItemCount("Delayed Emergency Device") > 0) FactSystem.SetFact(new Fact("APItemUnlock_DelayedEmergencyDevice"), 1);
+        if (connection.GetItemCount("Distance-Based Health Insurance") > 0) FactSystem.SetFact(new Fact("APItemUnlock_DistanceBasedHealthInsurance"), 1);
+        if (connection.GetItemCount("Energy Funnel") > 0) FactSystem.SetFact(new Fact("APItemUnlock_EnergyFunnel"), 1);
+        if (connection.GetItemCount("Extreme Herbs") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ExtremeHerbs"), 1);
+        if (connection.GetItemCount("Fragile Taco") > 0) FactSystem.SetFact(new Fact("APItemUnlock_FragileTaco"), 1);
+        if (connection.GetItemCount("Friendly Looking Star") > 0) FactSystem.SetFact(new Fact("APItemUnlock_FriendlyLookingStar"), 1);
+        if (connection.GetItemCount("Grunt's Helmet") > 0) FactSystem.SetFact(new Fact("APItemUnlock_GruntsHelmet"), 1);
+        if (connection.GetItemCount("Impact Activated Healing Drone") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ImpactActivatedHealingDrone"), 1);
+        if (connection.GetItemCount("Impulse Activated Stabilizer") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ImpulseActivatedStabilizer"), 1);
+        if (connection.GetItemCount("Intangibility") > 0) FactSystem.SetFact(new Fact("APItemUnlock_Intangibility"), 1);
+        if (connection.GetItemCount("Leadership Pipe") > 0) FactSystem.SetFact(new Fact("APItemUnlock_LeadershipPipe"), 1);
+        if (connection.GetItemCount("Low Grade Timeline Swapper") > 0) FactSystem.SetFact(new Fact("APItemUnlock_LowGradeTimelineSwapper"), 1);
+        if (connection.GetItemCount("Mortar and Pestle") > 0) FactSystem.SetFact(new Fact("APItemUnlock_MortarAndPestle"), 1);
+        if (connection.GetItemCount("Otherworldly Contact") > 0) FactSystem.SetFact(new Fact("APItemUnlock_OtherworldlyContact"), 1);
+        if (connection.GetItemCount("Overclocked Medical Drone") > 0) FactSystem.SetFact(new Fact("APItemUnlock_OverclockedMedicalDrone"), 1);
+        if (connection.GetItemCount("Performance Based Health Insurance") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PerformanceBasedHealthInsurance"), 1);
+        if (connection.GetItemCount("Personal Matter Stabilizer") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PersonalMatterStabilizer"), 1);
+        if (connection.GetItemCount("Pocket Snack") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PocketSnack"), 1);
+        if (connection.GetItemCount("Protective Medallion") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ProtectiveMedallion"), 1);
+        if (connection.GetItemCount("Pungent Herbs") > 0) FactSystem.SetFact(new Fact("APItemUnlock_PungentHerbs"), 1);
+        if (connection.GetItemCount("Quick Taco") > 0) FactSystem.SetFact(new Fact("APItemUnlock_QuickTaco"), 1);
+        if (connection.GetItemCount("Reheated Soup") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ReheatedSoup"), 1);
+        if (connection.GetItemCount("Replenishing Vial") > 0) FactSystem.SetFact(new Fact("APItemUnlock_ReplenishingVial"), 1);
+        if (connection.GetItemCount("Restorative Maneuver") > 0) FactSystem.SetFact(new Fact("APItemUnlock_RestorativeManeuver"), 1);
+        if (connection.GetItemCount("Velocity Powered Syringe") > 0) FactSystem.SetFact(new Fact("APItemUnlock_VelocityPoweredSyringe"), 1);
+        if (connection.GetItemCount("Steel Hat Lining") > 0) FactSystem.SetFact(new Fact("APItemUnlock_SteelHatLining"), 1);
+        if (connection.GetItemCount("Timeline Refactor") > 0) FactSystem.SetFact(new Fact("APItemUnlock_TimelineRefactor"), 1);
+        if (connection.GetItemCount("Blood Engine") > 0) FactSystem.SetFact(new Fact("APItemUnlock_BloodEngine"), 1);
         
         Player.localPlayer.ResetStats();
         SaveSystem.Save();

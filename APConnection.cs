@@ -456,6 +456,7 @@ public class Connection(string hostname, int port)
         if (loginSuccess.SlotData.TryGetValue("Unlock All Items", out object UnlockAllItems))
         {
             UnityMainThreadDispatcher.Instance().log($"AP found UnlockAllItems in slot data with value: {UnlockAllItems}");
+            FactSystem.SetFact(new Fact("Unlock All Items"), Convert.ToSingle(UnlockAllItems));
             if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f && Convert.ToSingle(UnlockAllItems) == 1)
             {
                 //only unlock once
@@ -465,6 +466,29 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get UnlockAllItems from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("Unlock All Items"), 0f);
+        }
+
+        if (loginSuccess.SlotData.TryGetValue("Item Unlocks", out object ItemUnlocks))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found Item Unlocks in slot data with value: {ItemUnlocks}");
+            FactSystem.SetFact(new Fact("Item Unlocks"), Convert.ToSingle(ItemUnlocks));
+                if (Convert.ToSingle(ItemUnlocks) == 1)
+                {
+                    if(FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
+                    {
+                    // lock all items once
+                        ItemDatabase.LockAll();
+                    }
+                    // the game resets the default unlocked items list on every load
+                    ItemDatabase.instance.defaultUnlockedItemsSet.Clear();
+                    ItemDatabase.instance.defaultUnlockedItems.Clear();
+                }
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get Item Unlocks from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("Item Unlocks"), 0f);
         }
 
 
