@@ -293,6 +293,10 @@ public class Connection(string hostname, int port)
                     FactSystem.SetFact(new Fact("APFragmentLimitShard8"), Convert.ToSingle(LFR));
                     FactSystem.SetFact(new Fact("APFragmentLimitShard9"), Convert.ToSingle(LFR));
                     FactSystem.SetFact(new Fact("APFragmentLimitShard10"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard11"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard12"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard13"), Convert.ToSingle(LFR));
+                    FactSystem.SetFact(new Fact("APFragmentLimitShard14"), Convert.ToSingle(LFR));
                     FactSystem.SetFact(new Fact("APFragmentLimitGlobal"), Convert.ToSingle(LFR));
                 }
             }
@@ -593,7 +597,7 @@ public class Connection(string hostname, int port)
         };
     }
 
-    private void ProcessItem(ReceivedItemsHelper rih, int index)
+    private static void ProcessItem(ReceivedItemsHelper rih, int index)
     {
         try
         {

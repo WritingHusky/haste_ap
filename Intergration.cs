@@ -142,6 +142,7 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Max Health Upgrade");
                         Player.localPlayer.ResetStats();
+                        ReaddItemStats();
                         break;
                     case "Max Lives Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Extra Lives Upgrade");
@@ -151,6 +152,7 @@ namespace Integration
                         FactSystem.AddToFact(new Fact("APUpgradeMaxLives"), 1f);
                         worthMentioning = true;
                         Player.localPlayer.ResetStats();
+                        ReaddItemStats();
                         break;
                     case "Max Energy Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Max Energy Upgrade");
@@ -159,6 +161,7 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Max Energy Upgrade");
                         Player.localPlayer.ResetStats();
+                        ReaddItemStats();
                         break;
                     case "Sparks in Fragments Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Sparks in Fragments Upgrade");
@@ -167,6 +170,7 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Sparks in Fragments Upgrade");
                         Player.localPlayer.ResetStats();
+                        ReaddItemStats();
                         break;
                     case "Item Rarity Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Item Rarity Upgrade");
@@ -175,6 +179,7 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Item Rarity Upgrade");
                         Player.localPlayer.ResetStats();
+                        ReaddItemStats();
                         break;
                     case "Starting Sparks Upgrade":
                         UnityMainThreadDispatcher.Instance().log("AP Got Starting Sparks Upgrade");
@@ -183,6 +188,7 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Starting Sparks Upgrade");
                         Player.localPlayer.ResetStats();
+                        ReaddItemStats();
                         break;
                     case "Persistent Common Speed Item":
                         UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Speed Item");
@@ -352,6 +358,15 @@ namespace Integration
             if (FactSystem.GetFact(new Fact("in_run")) == 1f)
             {
                 HasteAP.GenerateRandomStartingItems(rarity, category, 1f);
+            }
+        }
+
+        private static void ReaddItemStats()
+        {
+            if (FactSystem.GetFact(new Fact("in_run")) == 0f) return;
+            foreach (var item in Player.localPlayer.items)
+            {
+                Player.localPlayer.AddStats(item.stats, item.HasEntry<ItemInstanceData.HasAddedInitialStats>(), 1f);
             }
         }
 

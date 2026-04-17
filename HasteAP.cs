@@ -3,6 +3,7 @@ using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Landfall.Haste;
 using Landfall.Modding;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using TMPro;
 using UnityEngine;
@@ -29,7 +30,11 @@ public partial class HasteAP
         ApDebugLog.Instance.BuildFont();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage($"Archipelago Installed v{version}", isDebug: false);
+        
+        var Build = (new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime).ToShortDateString().GetHashCode().ToString("X");
+        
+        UnityMainThreadDispatcher.Instance().log($"Archipelago Installed v{version} ({Build})");
+        ApDebugLog.Instance.DisplayMessage($"Archipelago Installed v{version} ({Build})", isDebug: false);
 
         // Load everything up when the game starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
@@ -144,13 +149,14 @@ public partial class HasteAP
 
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
         SetHubState();
-        for (int i = 1; i <= 10; i++)
+        for (int i = 1; i <= 14; i++)
         {
             SetFragmentLimits("Shard"+i);
         }
         SetFragmentLimits("Global");
 
         FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
+        FactSystem.SubscribeToFact(new Fact("Current_UnlockedAscensionLevel"), UnbeatedDisasterShardHandler);
 
         // only need to bother with this once a savefile
         if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
@@ -281,6 +287,7 @@ public partial class HasteAP
 
         }
         FactSystem.UnsubscribeFromFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
+        FactSystem.UnsubscribeFromFact(new Fact("Current_UnlockedAscensionLevel"), UnbeatedDisasterShardHandler);
         UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
         ApDebugLog.Instance.DisplayMessage("AP Hooks Removed");
         connection.CloseTimer();
@@ -294,7 +301,7 @@ public partial class HasteAP
 
         var shard_count = connection.GetItemCount("Progressive Shard");
         // make sure to cap the current_unbeaten to the correct value so that the extra Prog Shards dont make a bug happen with an invalid state
-        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 9 : FactSystem.GetFact(new Fact("APShardGoal")) - 1f;
+        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 9 : Math.Min(FactSystem.GetFact(new Fact("APShardGoal")), 10) - 1f;
         // Never allow the value to be not what I want it to be
         if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
         {
@@ -305,6 +312,31 @@ public partial class HasteAP
         else
         {
             if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(shard_count, shard_cap));
+        }
+    }
+
+    private static void UnbeatedDisasterShardHandler(float value)
+    {
+        ApDebugLog.Instance.DisplayMessage($"unbeaten disaster shard update to (zero index){value}");
+        if (connection == null)
+            return;
+        
+        var shard_count = connection.GetItemCount("Progressive Shard") - 10;
+        
+        if (shard_count < 0)
+            return;
+        
+        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 4 : FactSystem.GetFact(new Fact("APShardGoal"));
+        
+        if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
+        {
+            var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated"))-10);
+            // if unlock-order is Boss-locked, then only unlock up until the lowest of either bossbeated or shards
+            if (value != newvalue) FactSystem.SetFact(new Fact("Current_UnlockedAscensionLevel"), Math.Min(newvalue, shard_cap));
+        }
+        else
+        {
+            if (value != shard_count) FactSystem.SetFact(new Fact("Current_UnlockedAscensionLevel"), Math.Min(shard_count, shard_cap));
         }
     }
 
@@ -500,8 +532,16 @@ public partial class HasteAP
             if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 1f)
             {
                 var currentShard = RunHandler.RunData.shardID + 1;
-                locationName = $"Shard {currentShard} Fragment Clear ";
-                FragKeyword = "Shard" + currentShard;
+                if (RunHandler.RunData.runConfig.ascensionLevel > 0)
+                {
+                    locationName = $"Disaster Shard {RunHandler.RunData.runConfig.ascensionLevel} Fragment Clear ";
+                    FragKeyword = "Shard" + (10 + RunHandler.RunData.runConfig.ascensionLevel);
+                }
+                else
+                {
+                    locationName = $"Shard {currentShard} Fragment Clear ";
+                    FragKeyword = "Shard" + currentShard;
+                }
             }
             else
             {
@@ -839,8 +879,16 @@ public partial class HasteAP
         {
             if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
             {
-                var currentShard = RunHandler.RunData.shardID + 1;
-                item_location = "Shard " + currentShard + " Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
+                var currentDisaster = RunHandler.RunData.runConfig.ascensionLevel;
+                var currentShard = RunHandler.RunData.shardID + 1 + currentDisaster;
+                if (currentDisaster > 0)
+                {
+                    item_location = $"Disaster Shard {currentDisaster} + Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
+                }
+                else
+                {
+                    item_location = $"Shard {currentShard} Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
+                }
                 FactSystem.AddToFact(new Fact("APShopsanityShard" + currentShard), 1f);
                 canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
             }
@@ -858,7 +906,7 @@ public partial class HasteAP
 
         if (canSend)
         {
-            UnityMainThreadDispatcher.Instance().log("AP sending Item: (" + item_location + ")");
+            UnityMainThreadDispatcher.Instance().log($"AP sending Item: ({item_location})");
             ApDebugLog.Instance.DisplayMessage("Bought Item");
 
             connection.SendLocation(item_location);
@@ -906,10 +954,12 @@ public partial class HasteAP
             return;
         }
         var currentShard = RunHandler.RunData.shardID + 1;
-        FactSystem.SetFact(new Fact("APBossDefeated"), Math.Max(FactSystem.GetFact(new Fact("APBossDefeated")), currentShard));
+        var currentDisaster = RunHandler.RunData.runConfig.ascensionLevel;
+        FactSystem.SetFact(new Fact("APBossDefeated"), Math.Max(FactSystem.GetFact(new Fact("APBossDefeated")), currentShard + currentDisaster));
         SaveSystem.Save();
 
-        var boss_location = "Shard " + currentShard + " Boss";
+        var boss_location = $"Shard {currentShard} Boss";
+        if (currentDisaster > 0) boss_location = $"Disaster Shard {currentDisaster} Boss";
         UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");
         ApDebugLog.Instance.DisplayMessage("Boss Defeated");
 
@@ -1101,7 +1151,8 @@ public partial class HasteAP
         }
         if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, !connection.WillNeedToForceReload);
+            //TODO: make this notification not fucking crash all the time
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, false);
         }
     }
 
@@ -1110,15 +1161,15 @@ public partial class HasteAP
         SkinManager.CompleteRunUnlockSkins((int)FactSystem.GetFact(new Fact("current_unbeaten_shard")) - 1);
         if (FactSystem.GetFact(new Fact("Has_Won_Game")) > 0f)
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Crispy, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.Crispy, false);
         }
         if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, false);
         }
         if (FactSystem.GetFact(new Fact("Current_UnlockedAscensionLevel")) >= 2f)
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.DarkClown, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.DarkClown, false);
         }
     }
 
