@@ -29,7 +29,11 @@ public partial class HasteAP
         ApDebugLog.Instance.BuildFont();
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
-        ApDebugLog.Instance.DisplayMessage($"Archipelago Installed v{version}", isDebug: false);
+                
+        var Build = (new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime).ToShortDateString().GetHashCode().ToString("X");
+        
+        UnityMainThreadDispatcher.Instance().log($"Archipelago Installed v{version} ({Build})");
+        ApDebugLog.Instance.DisplayMessage($"Archipelago Installed v{version} ({Build})", isDebug: false);
 
         // Load everything up when the game starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
@@ -1103,7 +1107,7 @@ public partial class HasteAP
         }
         if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, !connection.WillNeedToForceReload);
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, false);
         }
     }
 
@@ -1112,15 +1116,15 @@ public partial class HasteAP
         SkinManager.CompleteRunUnlockSkins((int)FactSystem.GetFact(new Fact("current_unbeaten_shard")) - 1);
         if (FactSystem.GetFact(new Fact("Has_Won_Game")) > 0f)
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Crispy, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.Crispy, false);
         }
         if (MetaProgression.IsUnlocked(AbilityKind.BoardBoost) && MetaProgression.IsUnlocked(AbilityKind.Fly) && MetaProgression.IsUnlocked(AbilityKind.Grapple) && MetaProgression.IsUnlocked(AbilityKind.Slomo))
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.Wobbler, false);
         }
         if (FactSystem.GetFact(new Fact("Current_UnlockedAscensionLevel")) >= 2f)
         {
-            SkinManager.UnlockSkin(SkinManager.Skin.DarkClown, true);
+            SkinManager.UnlockSkin(SkinManager.Skin.DarkClown, false);
         }
     }
 
