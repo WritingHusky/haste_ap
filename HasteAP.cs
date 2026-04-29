@@ -300,11 +300,13 @@ public partial class HasteAP
         {
             var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
             // if unlock-order is Boss-locked, then only unlock up until the lowest of either bossbeated or shards
-            if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(newvalue, shard_cap));
+            var desiredvalue = Math.Min(newvalue, shard_cap);
+            if (value != desiredvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), desiredvalue);
         }
         else
         {
-            if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(shard_count, shard_cap));
+            var desiredvalue = Math.Min(shard_count, shard_cap);
+            if (value != desiredvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), desiredvalue);
         }
     }
 
