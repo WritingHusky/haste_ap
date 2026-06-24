@@ -366,24 +366,25 @@ public class Connection(string hostname, int port)
                 } else
                 {
                     FactSystem.SetFact(new Fact("active_ability"), Convert.ToSingle(StartingAbility) - 1f);
-                    switch (Convert.ToSingle(StartingAbility))
-                    {
-                        case 1f:
-                            // the new unlock function (that handles board) isnt set by this point so i gotta set the fact manually here lmao
-                            FactSystem.SetFact(new Fact("APBoostUnlocked"), 1f);
-                            break;
-                        case 2f:
-                            MetaProgression.Unlock(AbilityKind.Slomo);
-                            break;
-                        case 3f:
-                            MetaProgression.Unlock(AbilityKind.Grapple);
-                            break;
-                        case 4f:
-                            MetaProgression.Unlock(AbilityKind.Fly);
-                            break;
-
-                    }
                 }
+            }
+            FactSystem.SetFact(new Fact("APStartingAbility"), Convert.ToSingle(StartingAbility));
+            switch (Convert.ToSingle(StartingAbility))
+            {
+                case 1f:
+                    // the new unlock function (that handles board) isnt set by this point so i gotta set the fact manually here lmao
+                    FactSystem.SetFact(new Fact("APBoostUnlocked"), 1f);
+                    break;
+                case 2f:
+                    MetaProgression.Unlock(AbilityKind.Slomo);
+                    break;
+                case 3f:
+                    MetaProgression.Unlock(AbilityKind.Grapple);
+                    break;
+                case 4f:
+                    MetaProgression.Unlock(AbilityKind.Fly);
+                    break;
+
             }
         }
         else
@@ -500,8 +501,7 @@ public class Connection(string hostname, int port)
 
     public void SendLocation(string locationName)
     {
-        UnityMainThreadDispatcher.Instance().log($"AP Sending location {locationName}");
-        ApDebugLog.Instance.DisplayMessage($"Sending location {locationName}");
+        HasteAP.PrintBothDebug($"Sending location {locationName}");
         long locationID = session.Locations.GetLocationIdFromName(game, locationName);
         if (locationID != -1)
         {
@@ -509,15 +509,13 @@ public class Connection(string hostname, int port)
         }
         else
         {
-            UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> No locationID for check: {locationName}", isDebug:false, duration: 15f);
+            HasteAP.PrintBothDebug($"No locationID for name: {locationName}", isError:true, isDebug:false, duration: 15f);
         }
     }
 
     public void SendHintedLocation(string locationName)
     {
-        UnityMainThreadDispatcher.Instance().log($"AP Scouting location {locationName}");
-        ApDebugLog.Instance.DisplayMessage($"Scouting location {locationName}");
+        HasteAP.PrintBothDebug($"AP Scouting location {locationName}");
         long locationID = session.Locations.GetLocationIdFromName(game, locationName);
         if (locationID != -1)
         {
@@ -525,15 +523,13 @@ public class Connection(string hostname, int port)
         }
         else
         {
-            UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> No locationID for hint location: {locationName}", isDebug: false, duration: 15f);
+            HasteAP.PrintBothDebug($"No locationID for name: {locationName}", isError:true, isDebug:false, duration: 15f);
         }
     }
 
     public (string, string) RetrieiveLocationData(string locationName)
     {
-        UnityMainThreadDispatcher.Instance().log($"Retrieivng location {locationName}");
-        ApDebugLog.Instance.DisplayMessage($"Retrieivng location {locationName}");
+        HasteAP.PrintBothDebug($"AP Retrieivng location {locationName}");
         long locationID = session.Locations.GetLocationIdFromName(game, locationName);
         if (locationID != -1)
         {
@@ -542,8 +538,7 @@ public class Connection(string hostname, int port)
         }
         else
         {
-            UnityMainThreadDispatcher.Instance().logError($"AP No locationID for name: {locationName}");
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> No locationID for hint location: {locationName}", isDebug: false, duration: 15f);
+            HasteAP.PrintBothDebug($"No locationID for hint location: {locationName}", isError:true, isDebug:false, duration: 15f);
             return ($"ERROR: Could not find location {locationName}", "UNKNOWN");
         }
     }
@@ -558,9 +553,8 @@ public class Connection(string hostname, int port)
     
     public void BuildItemReciver(Action<string, string> GiveItem)
     {
-
-        UnityMainThreadDispatcher.Instance().log("AP Building Item Reiever");
-        ApDebugLog.Instance.DisplayMessage($"Built item reciever");
+        
+        HasteAP.PrintBothDebug("Building item reciever");
 
         session.Items.ItemReceived += (rih) =>
         {
@@ -572,28 +566,26 @@ public class Connection(string hostname, int port)
             }
             catch (Exception e)
             {
-                UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f);
+                HasteAP.PrintBothDebug($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f, isError: true);
             }
             
             if (IsItSafe())
             {
                 int copy = rih.Index;
                 UnityMainThreadDispatcher.Instance().log($"Item received of index {copy} and safe to go.");
-                ProcessItem(rih, copy);
+                ProcessItem(rih, copy, false);
             } else
             {
                 // lambda-capture lookin-ass workaround i swear to god
                 int copy = rih.Index;
-                UnityMainThreadDispatcher.Instance().log($"AP Enqueing Item of index {copy} to Actions Queue because its not safe.");
-                ApDebugLog.Instance.DisplayMessage($"AP Enqueing Item of index {copy} to Actions Queue because its not safe.");
-                actions.Enqueue(() => ProcessItem(rih, copy));
+                HasteAP.PrintBothDebug($"Enqueing Item of index {copy} to Actions Queue because its not safe.");
+                actions.Enqueue(() => ProcessItem(rih, copy, true));
             }
             
         };
     }
 
-    private void ProcessItem(ReceivedItemsHelper rih, int index)
+    private void ProcessItem(ReceivedItemsHelper rih, int index, bool isAsync)
     {
         try
         {
@@ -601,16 +593,14 @@ public class Connection(string hostname, int port)
 
             if (index <= FactSystem.GetFact(new Fact("APExpectedIndex")))
             {
-                UnityMainThreadDispatcher.Instance().log($"AP Item {itemReceivedInfo.ItemName} has index {index}, which is not greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
-                ApDebugLog.Instance.DisplayMessage($"AP Item {itemReceivedInfo.ItemName} has index {index}, which is not greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
+                HasteAP.PrintBothDebug($"AP Item {itemReceivedInfo.ItemName} has index {index}, which is not greater than the expected index {FactSystem.GetFact(new Fact("APExpectedIndex"))} and has been ignored");
                 return;
             }
 
-            UnityMainThreadDispatcher.Instance().log($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {index}");
-            ApDebugLog.Instance.DisplayMessage($"Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {index}");
+            HasteAP.PrintBothDebug($"AP Atempting to give {itemReceivedInfo.ItemName} from {itemReceivedInfo.Player.Name} with index {index}");
             Integration.Integration.GiveItem(itemReceivedInfo.ItemName, itemReceivedInfo.Player.Name);
             FactSystem.AddToFact(new Fact("APExpectedIndex"), 1f);
-            SaveSystem.Save();
+            if (!isAsync) SaveSystem.Save();
 
 
 
@@ -619,8 +609,7 @@ public class Connection(string hostname, int port)
         {
             if (e.GetType() != typeof(NullReferenceException))
             {
-                UnityMainThreadDispatcher.Instance().log($"Error in giving item {e.Message},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f);
+                HasteAP.PrintBothDebug($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f, isError: true);
             }
         }
     }
@@ -679,24 +668,28 @@ public class Connection(string hostname, int port)
         // NOT loading/looking at any other UI screen
         if (RunHandler.InRun && RunHandler.RunData.currentNodeStatus != NGOPlayer.PlayerNodeStatus.Running)
         {
-            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: In Run and Loading");
-            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: In Run and Loading");
+            HasteAP.PrintBothDebug("Safety Check Fail: In Run and Loading");
             return false;
         }
 
         // loading
         if (UI_TransitionHandler.IsTransitioning)
         {
-            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Is Transitioning");
-            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Is Transitioning");
+            HasteAP.PrintBothDebug("Safety Check Fail: Is Transitioning");
             return false;
         }
 
         // any UI screen is open
         if (!HasteInputSystem.CanTakeInput() || InteractionHandler.IsPlayingInteraction)
         {
-            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Player lacks control");
-            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Player lacks control");
+            HasteAP.PrintBothDebug("Safety Check Fail: Player lacks control");
+            return false;
+        }
+
+        // time is stopped
+        if (TimeHandler.instance.stopTime || TimeHandler.instance.collisionTime < 0.999f)
+        {
+            HasteAP.PrintBothDebug("Safety Check Fail: Time is stopped");
             return false;
         }
         
@@ -705,16 +698,14 @@ public class Connection(string hostname, int port)
         {
             if (FactSystem.GetFact(new Fact("APSafelyInHub")) == 0f)
             {
-                UnityMainThreadDispatcher.Instance().log($"Safety Check Fail: Hub not done yet {FactSystem.GetFact(new Fact("in_run"))} {FactSystem.GetFact(new Fact("APSafelyInHub"))}");
-                ApDebugLog.Instance.DisplayMessage($"Safety Check Fail: Hub not done yet {FactSystem.GetFact(new Fact("in_run"))} {FactSystem.GetFact(new Fact("APSafelyInHub"))}");
+                HasteAP.PrintBothDebug($"Safety Check Fail: Hub not done yet {FactSystem.GetFact(new Fact("in_run"))} {FactSystem.GetFact(new Fact("APSafelyInHub"))}");
                 return false;
             }
         }
         
         if (FactSystem.GetFact(new Fact("played_StartGame01")) == 0f)
         {
-            UnityMainThreadDispatcher.Instance().log("Safety Check Fail: Haven't had first conversation with Daro");
-            ApDebugLog.Instance.DisplayMessage("Safety Check Fail: Haven't had first conversation with Daro");
+            HasteAP.PrintBothDebug("Safety Check Fail: Haven't had first conversation with Daro");
             return false;
         }
 

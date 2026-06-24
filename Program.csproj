@@ -52,4 +52,13 @@
       <Publicize Include="Assembly-CSharp" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="Resources\BuildDate.txt" />
+      <EmbeddedResource Include="Resources\BuildDate.txt" />
+    </ItemGroup>
+
+    <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
+      <Exec Command="echo %24(date +%25F) &gt; &quot;$(ProjectDir)Resources/BuildDate.txt&quot;" />
+    </Target>
+
 </Project>
