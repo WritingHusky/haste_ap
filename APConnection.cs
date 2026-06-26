@@ -687,12 +687,17 @@ public class Connection(string hostname, int port)
             return false;
         }
 
-        // time is stopped
-        if (TimeHandler.instance.stopTime || TimeHandler.instance.collisionTime < 0.999f)
+        try
         {
-            HasteAP.PrintBothDebug("Safety Check Fail: Time is stopped");
-            return false;
+            // time is stopped
+            if (TimeHandler.instance.stopTime || TimeHandler.instance.collisionTime < 0.999f)
+            {
+                HasteAP.PrintBothDebug("Safety Check Fail: Time is stopped");
+                return false;
+            }
         }
+        catch {}
+        // apparently the Time (tm) object doesn't exist until sometime after loading a savefile, so this breaks everything during the initial load
         
         // in hub and can actually move
         if (FactSystem.GetFact(new Fact("in_run")) == 0f)
