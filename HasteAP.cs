@@ -97,7 +97,7 @@ public partial class HasteAP
         connection = new Connection(serverName, serverPort);
 
         // This must go BEFORE connection
-        connection.BuildItemReciver(GiveItem);
+        connection.BuildItemReceiver(GiveItem);
         connection.BuildMessageReciver();
 
         if (!connection.Connect(username, password, version))
@@ -562,11 +562,11 @@ public partial class HasteAP
         orig();
         // eval
         PrintBothDebug($"Start of fragment, evaluating traps");
-        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f)
         {
             RemoveTrap(TrapsList.Disaster);
         }
-        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
         {
             ActivateTrap(TrapsList.Disaster);
         }
@@ -576,17 +576,13 @@ public partial class HasteAP
         }
 
 
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f)
         {
             RemoveTrap(TrapsList.Landing);
         }
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
         {
             ActivateTrap(TrapsList.Landing);
-        }
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f)
-        {
-            FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
         }
     }
 
@@ -597,20 +593,18 @@ public partial class HasteAP
         {
             case TrapsList.Disaster:
                 // i betcha there'll be some dumb shit i'm gonna need to fix when I eventually add the disaster shards as goals
-                if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
+                if (FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
                 {
                     UnityMainThreadDispatcher.Instance().log($"Attempting to add disaster trap");
-                    FactSystem.SetFact(new Fact("APDisasterTrapActive"), 1f);
                     FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 1f);
                     ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
                     Player.localPlayer.AddItem(DisasterItem);
                 }
                 break;
             case TrapsList.Landing:
-                if (FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
+                if (FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
                 {
                     UnityMainThreadDispatcher.Instance().log($"Attempting to add landing trap");
-                    FactSystem.SetFact(new Fact("APLandingTrapActive"), 1f);
                     FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 1f);
                 }
                 break;
@@ -622,21 +616,23 @@ public partial class HasteAP
     private static void DecrementTraps()
     {
         PrintBothDebug($"Decrementing traps");
-        if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) >= 1f)
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f)
         {
-            FactSystem.AddToFact(new Fact("APDisasterTrapActive"), -1f);
-            if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
+            FactSystem.AddToFact(new Fact("APQueuedDisasterTraps"), -1f);
+            if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f)
             {
                 RemoveTrap(TrapsList.Disaster);
             }
+            PrintBothDebug($"You have {FactSystem.GetFact(new Fact("APQueuedDisasterTraps"))} Disaster Traps remaining.", isDebug:false);
         }
-        if (FactSystem.GetFact(new Fact("APLandingTrapActive")) >= 1f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f)
         {
-            FactSystem.AddToFact(new Fact("APLandingTrapActive"), -1f);
-            if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
+            FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
+            if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f)
             {
                 RemoveTrap(TrapsList.Landing);
             }
+            PrintBothDebug($"You have {FactSystem.GetFact(new Fact("APQueuedLandingTraps"))} Landing Traps remaining.", isDebug:false);
         }
     }
 
@@ -1268,7 +1264,7 @@ public partial class HasteAP
         if (isError)
         {
             UnityMainThreadDispatcher.Instance().logError($"AP {message}");
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> {message}", duration, isDebug);
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> {message}", duration, false);
         }
         else
         {

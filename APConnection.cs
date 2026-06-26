@@ -551,10 +551,9 @@ public class Connection(string hostname, int port)
         ApDebugLog.Instance.DisplayMessage($"AP Disconnected", isDebug:false);
     }
     
-    public void BuildItemReciver(Action<string, string> GiveItem)
+    public void BuildItemReceiver(Action<string, string> GiveItem)
     {
-        
-        HasteAP.PrintBothDebug("Building item reciever");
+        UnityMainThreadDispatcher.Instance().log("Building item receiver");
 
         session.Items.ItemReceived += (rih) =>
         {
@@ -566,7 +565,8 @@ public class Connection(string hostname, int port)
             }
             catch (Exception e)
             {
-                HasteAP.PrintBothDebug($"Error in printing message {e.Message},{e.StackTrace}", duration: 10f, isError: true);
+                UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
+                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Error in printing message {e.Message},{e.StackTrace}", duration: 10f, false);
             }
             
             if (IsItSafe())
@@ -578,7 +578,8 @@ public class Connection(string hostname, int port)
             {
                 // lambda-capture lookin-ass workaround i swear to god
                 int copy = rih.Index;
-                HasteAP.PrintBothDebug($"Enqueing Item of index {copy} to Actions Queue because its not safe.");
+                UnityMainThreadDispatcher.Instance().log($"Enqueing Item of index {copy} to Actions Queue because its not safe.");
+                ApDebugLog.Instance.DisplayMessage($"Enqueing Item of index {copy} to Actions Queue because its not safe.");
                 actions.Enqueue(() => ProcessItem(rih, copy, true));
             }
             
