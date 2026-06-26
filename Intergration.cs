@@ -414,6 +414,9 @@ namespace Integration
             FactSystem.SetFact(new Fact("researcher_in_hub"), 1f);
             FactSystem.SetFact(new Fact("riza_in_hub"), 1f);
             
+            FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 0f);
+            FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 0f);
+            
         }
 
 
