@@ -2,6 +2,7 @@ using Archipelago.MultiClient.Net;
 using Archipelago.MultiClient.Net.BounceFeatures.DeathLink;
 using Archipelago.MultiClient.Net.Colors;
 using Archipelago.MultiClient.Net.Enums;
+using Archipelago.MultiClient.Net.Exceptions;
 using Archipelago.MultiClient.Net.Helpers;
 using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
@@ -19,18 +20,25 @@ public class Connection(string hostname, int port)
 
     public string dataTag = "Haste";
     public ArchipelagoSession session = ArchipelagoSessionFactory.CreateSession(hostname, port);
+    private string hostname = hostname;
+    private int port = port;
 
     public string username = "";
+    public string password = "";
 
     public DeathLinkService? deathLinkService;
 
     private static Timer backgroundTimer;
     private Queue<Action> actions = new ();
     public bool WillNeedToForceReload = false;
+    public bool HasDisconnected = false;
+    public bool AttemptingReconnect = false;
+    private List<string> LocationsToBeSent = [];
 
     public bool Connect(string user = "Player1", string? pass = null, Version? modVersion = null)
     {
         username = user;
+        password = pass;
         LoginResult result;
         try
         {
@@ -501,20 +509,44 @@ public class Connection(string hostname, int port)
 
     public void SendLocation(string locationName)
     {
-        HasteAP.PrintBothDebug($"Sending location {locationName}");
-        long locationID = session.Locations.GetLocationIdFromName(game, locationName);
-        if (locationID != -1)
+        if (HasDisconnected)
         {
-            session.Locations.CompleteLocationChecks(locationID);
+            HasteAP.PrintBothDebug($"Could not send location {locationName} due to connection problems. Once the connection is restored the location will be sent.\nDo NOT close the game until the location has been sent, otherwise location progress may be lost.", isDebug:false);
+            LocationsToBeSent.Add(locationName);
+            return;
         }
-        else
+        try
         {
-            HasteAP.PrintBothDebug($"No locationID for name: {locationName}", isError:true, isDebug:false, duration: 15f);
+            long locationID = session.Locations.GetLocationIdFromName(game, locationName);
+            if (locationID != -1)
+            {
+                HasteAP.PrintBothDebug($"Sending location {locationName}");
+                session.Locations.CompleteLocationChecks(locationID);
+
+            }
+            else
+            {
+                HasteAP.PrintBothDebug($"No locationID for name: {locationName}", isError:true, isDebug:false, duration: 15f);
+            }
+        }
+        catch (Exception e)
+        {
+            HasteAP.PrintBothDebug($"Error in sending location {locationName}\n{e.Message}", isError:true);
+            // this is just assuming its a connection issue that hasn't been noticed, and it'll fix itself with the other functions
+            // i will likely regret this implementation within a week
+            LocationsToBeSent.Add(locationName);
         }
     }
 
     public void SendHintedLocation(string locationName)
     {
+        if (!PermittedToScout()) return;
+        if (HasDisconnected)
+        {
+            HasteAP.PrintBothDebug($"Could not scout location {locationName} due to connection problems. Please try again once the connection is restored.", isDebug:false);
+            return;
+        }
+
         HasteAP.PrintBothDebug($"AP Scouting location {locationName}");
         long locationID = session.Locations.GetLocationIdFromName(game, locationName);
         if (locationID != -1)
@@ -527,9 +559,14 @@ public class Connection(string hostname, int port)
         }
     }
 
-    public (string, string) RetrieiveLocationData(string locationName)
+    public (string, string) RetrieveLocationData(string locationName)
     {
-        HasteAP.PrintBothDebug($"AP Retrieivng location {locationName}");
+        if (HasDisconnected)
+        {
+            HasteAP.PrintBothDebug($"Could not get location {locationName} due to connection problems. Please try again once the connection is restored.", isDebug:false);
+            return ("CONNECTION ERROR", "CONNECTION ERROR");
+        }
+        HasteAP.PrintBothDebug($"AP Retrieving location {locationName}");
         long locationID = session.Locations.GetLocationIdFromName(game, locationName);
         if (locationID != -1)
         {
@@ -633,12 +670,95 @@ public class Connection(string hostname, int port)
         session.Socket.SendPacket(packet);
     }
 
-    public void BuildMessageReciver()
+    public void BuildMessageReceiver()
     {
         session.MessageLog.OnMessageReceived += (message) =>
         {
             ApDebugLog.Instance.DisplayMessage(message, isDebug: false);
         };
+    }
+    
+    
+    public void BuildErrorHandler()
+    {
+        session.Socket.ErrorReceived += (exception, message) =>
+        {
+            HasteAP.PrintBothDebug($"Connection Error Received: {exception.Message}");
+
+            if (exception.Message.Contains("closed the WebSocket connection") || exception is ArchipelagoSocketClosedException)
+            {
+                // stop things and try to recover
+                ResetSession();
+                PrepareReconnect();
+            }
+        };
+    }
+
+    public void BuildPacketHandler()
+    {
+        session.Socket.PacketReceived += packet =>
+        {
+            if (packet is ConnectedPacket)
+            {
+                HasteAP.PrintBothDebug("got a packet, its all good now");
+                AttemptingReconnect = false;
+                HasDisconnected = false;
+            }
+        };
+    }
+
+    public void ResetSession()
+    {
+        session = null;
+        session = ArchipelagoSessionFactory.CreateSession(hostname, port);
+        BuildItemReceiver(Integration.Integration.GiveItem);
+        BuildMessageReceiver();
+        BuildErrorHandler();
+        BuildPacketHandler();
+        deathLinkService = session.CreateDeathLinkService();
+        if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f){
+
+            deathLinkService!.OnDeathLinkReceived += Integration.Integration.GiveDeath;
+            deathLinkService!.EnableDeathLink();
+        }
+
+        HasDisconnected = true;
+    }
+
+    public void PrepareReconnect()
+    {
+        Thread.Sleep(5000);
+        TryReconnect();
+    }
+
+    public void TryReconnect()
+    {
+        if (AttemptingReconnect) return;
+        AttemptingReconnect = true;
+        //startsession()? mostly just socket functions I dont care about?
+        var result = session.TryConnectAndLogin(game, username, ItemsHandlingFlags.AllItems, password: password);
+        if (!result.Successful)
+        {
+            LoginFailure failure = (LoginFailure)result;
+            string errorMessage = $"Failed to reconnect to {server} as {username}:";
+            foreach (string error in failure.Errors)
+            {
+                errorMessage += $"\n    {error}";
+            }
+            foreach (ConnectionRefusedError error in failure.ErrorCodes)
+            {
+                errorMessage += $"\n    {error}";
+            }
+            HasteAP.PrintBothDebug(errorMessage);
+            HasteAP.PrintBothDebug("Reconnection failed, reattempting...", isDebug:false);
+            AttemptingReconnect = false;
+            PrepareReconnect();
+        }
+        else
+        {
+            HasDisconnected = false;
+            AttemptingReconnect = false;
+        }
     }
 
     public void CompleteGame()
@@ -662,7 +782,23 @@ public class Connection(string hostname, int port)
     {
         return session.Locations.AllLocationsChecked.Contains(session.Locations.GetLocationIdFromName(game, location));
     }
-    
+
+    public bool PermittedToScout()
+    {
+        var setting = GameHandler.Instance.SettingsHandler.GetSetting<ApHubScoutSetting>().Value;
+        switch (setting)
+        {
+            // case HubScoutMode.Yaml:
+            //     //TODO: get the info from slotdata or something
+            //     return false;
+            //     break;
+            case HubScoutMode.Disabled:
+                return false;
+            case HubScoutMode.Enabled:
+            default:
+                return true;
+        }
+    }
     
     public bool IsItSafe()
     {
@@ -734,6 +870,15 @@ public class Connection(string hostname, int port)
 
             }
             if (WillNeedToForceReload) Integration.Integration.ForceReload();
+            
+            if (!HasDisconnected && LocationsToBeSent.Count != 0)
+            {
+                foreach (string? item in LocationsToBeSent)
+                {
+                    SendLocation(item);
+                }
+                LocationsToBeSent.Clear();
+            }
         };
         backgroundTimer.AutoReset = true;
         backgroundTimer.Enabled = true;

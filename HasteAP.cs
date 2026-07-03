@@ -98,7 +98,9 @@ public partial class HasteAP
 
         // This must go BEFORE connection
         connection.BuildItemReceiver(GiveItem);
-        connection.BuildMessageReciver();
+        connection.BuildMessageReceiver();
+        connection.BuildErrorHandler();
+        connection.BuildPacketHandler();
 
         if (!connection.Connect(username, password, version))
         {
@@ -462,11 +464,18 @@ public partial class HasteAP
     {
         if (connection != null)
         {
-            ClearHooks();
-            connection.Close();
-            connection = null;
-            PrintBothDebug("Removed connection");
-            FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
+            try
+            {
+                ClearHooks();
+                connection.Close();
+                connection = null;
+                PrintBothDebug("Removed connection");
+                FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
+            }
+            catch (Exception e)
+            {
+                PrintBothDebug($"Error in loading main menu: {e.Message}", isError:true);
+            }
         }
 
         orig();
@@ -699,39 +708,48 @@ public partial class HasteAP
                 break;
         }
 
-        foreach (ItemInstance ii in ItemDatabase.instance.items)
+        try
         {
-            // legendary items dont have an exclusion table, and just get them all
-            if (category != APItemCategory.Legendary) {
-                if (!referenceTable.Contains(ii.itemName)) { continue; }
-            }
-            if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPersistentItems")) == 2f) { continue; }
-            if (ItemDatabase.ItemIsAcceptable(ii, TagInteraction.None, null, GetRandomItemFlags.Major, null))
+            foreach (ItemInstance ii in ItemDatabase.instance.items)
             {
-                itemlist.Add(ii);
+                // legendary items dont have an exclusion table, and just get them all
+                if (category != APItemCategory.Legendary) {
+                    if (!referenceTable.Contains(ii.itemName)) { continue; }
+                }
+                if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPersistentItems")) == 2f) { continue; }
+                if (ItemDatabase.ItemIsAcceptable(ii, TagInteraction.None, null, GetRandomItemFlags.Major, null))
+                {
+                    itemlist.Add(ii);
+                }
             }
-        }
 
-        if (itemlist.Count == 0)
-        {
-            PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item before run start due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
-            return;
-        }
+            if (itemlist.Count == 0)
+            {
+                PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item before run start due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
+                return;
+            }
 
-        // loop for q, select q items and add to player
-        System.Random random = new();
-        for (int i = 0; i < (int)q; i++)
-        {
-            ItemInstance newitem = ItemDatabase.SelectItemWithRarity(itemlist, rarity, random);
-            if (newitem != null)
+            // loop for q, select q items and add to player
+            System.Random random = new();
+            for (int i = 0; i < (int)q; i++)
             {
-                FactSystem.SetFact(new Fact($"{newitem.itemName}_ShowItem"), 1f);
-                Player.localPlayer.AddItem(newitem);
-            } else
-            {
-                PrintBothDebug($"Could not generate {rarity} {category} item before run start for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false, isError:true);
+                ItemInstance newitem = ItemDatabase.SelectItemWithRarity(itemlist, rarity, random);
+                if (newitem != null)
+                {
+                    FactSystem.SetFact(new Fact($"{newitem.itemName}_ShowItem"), 1f);
+                    Player.localPlayer.AddItem(newitem);
+                } else
+                {
+                    PrintBothDebug($"Could not generate {rarity} {category} item before run start for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false, isError:true);
+                }
             }
         }
+        catch (Exception e)
+        {
+            PrintBothDebug($"!!!PLEASE SHOW THIS TO THE DEV!!!: Error in generating persistent {rarity} {category}:\n {e.Message}, {e.InnerException}, {e.StackTrace}", duration: 15f, isDebug:false, isError:true);
+        }
+        
+        
     }
 
     public static void SetFragmentLimits(string keyword)
@@ -1147,11 +1165,19 @@ public partial class HasteAP
             Amount.gameObject.SetActive(false);
 
             var rowText = StatType.gameObject.GetComponent<TextMeshProUGUI>();
-            //ApDebugLog.Instance.DisplayMessage($"chaning data for row {rowText.text} of obj {rowText.GetInstanceID()}");
+            //ApDebugLog.Instance.DisplayMessage($"changing data for row {rowText.text} of obj {rowText.GetInstanceID()}");
 
-
-            var locationData = connection.RetrieiveLocationData(GetCaptainUpgradeName(self.kind.ToString(), Math.Min(self._entry.CurrentLevel, self._entry.levels.Length-2)));
-            rowText.text = $"{locationData.Item1} for {locationData.Item2}";
+            if (self._entry.CurrentLevel > self._entry.levels.Length-2)
+            {
+                rowText.text = $"SOLD OUT";
+            }
+            else
+            {
+                var caplocname = GetCaptainUpgradeName(self.kind.ToString(), Math.Min(self._entry.CurrentLevel, self._entry.levels.Length-2));
+                var locationData = connection.RetrieveLocationData(caplocname);
+                connection.SendHintedLocation(caplocname);
+                rowText.text = $"{locationData.Item1} for {locationData.Item2}";
+            }
             rowText.rectTransform.offsetMax = new Vector2(-248f, rowText.rectTransform.offsetMax.y);
             //ApDebugLog.Instance.DisplayMessage($"changes complete for {rowText.text} of obj {rowText.GetInstanceID()}");
         }
@@ -1181,7 +1207,9 @@ public partial class HasteAP
                 PrintBothDebug("On Skin Popup Open the connection is null");
                 return;
             };
-            var locationData = connection.RetrieiveLocationData($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
+            var faslocname = $"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}";
+            var locationData = connection.RetrieveLocationData(faslocname);
+            connection.SendHintedLocation(faslocname);
             self.headerLabel.text = $"{locationData.Item1} for {locationData.Item2}";
         }
     }
@@ -1401,6 +1429,19 @@ public partial class HasteAP
         connection.SendLocation(loc);
     }
     
+    [ConsoleCommand]
+    public static void WhatTheDogDoin()
+    {
+        UnityMainThreadDispatcher.Instance()
+            .log($"AP connection data: DC:{connection.HasDisconnected} AR:{connection.AttemptingReconnect}");
+    }
+    
+    [ConsoleCommand]
+    public static void ForceReconnection()
+    {
+        connection.AttemptingReconnect = false;
+        connection.PrepareReconnect();
+    }
     
     [ConsoleCommand]
     public static void ImportSaveData(string path)
@@ -1600,6 +1641,25 @@ public class ApPasswordSetting : StringSetting, IExposedSetting
 }
 
 [HasteSetting]
+public class ApHubScoutSetting : EnumSetting<HubScoutMode>, IExposedSetting
+{
+    public override void ApplyValue()
+    {
+        UnityMainThreadDispatcher.Instance().log($"AP Changed Hub Scout to {Value}");
+    }
+
+    //TODO: switch this to Yaml once the new version releases
+    protected override HubScoutMode GetDefaultValue() => HubScoutMode.Enabled;
+    public override List<LocalizedString> GetLocalizedChoices() => [
+        new UnlocalizedString("Enabled"), 
+        new UnlocalizedString("Disabled"), 
+        // new UnlocalizedString("Inherit from Yaml"),
+    ];
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Scout Hub Purchase locations");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
 public class ApSendDeathModeSetting : EnumSetting<DeathLinkMode>, IExposedSetting
 {
     public override void ApplyValue()
@@ -1637,4 +1697,10 @@ public class ApReceiveDeathModeSetting : EnumSetting<DeathLinkMode>, IExposedSet
 public enum DeathLinkMode
 {
     OnShardFail, OnDeath
+}
+
+//TODO: add the yaml option when v0.5 comes out
+public enum HubScoutMode
+{
+    Enabled, Disabled
 }
