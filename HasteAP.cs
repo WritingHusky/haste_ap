@@ -97,10 +97,7 @@ public partial class HasteAP
         connection = new Connection(serverName, serverPort);
 
         // This must go BEFORE connection
-        connection.BuildItemReceiver(GiveItem);
-        connection.BuildMessageReceiver();
-        connection.BuildErrorHandler();
-        connection.BuildPacketHandler();
+        connection.SetupHandlers();
 
         if (!connection.Connect(username, password, version))
         {
@@ -293,6 +290,7 @@ public partial class HasteAP
         FactSystem.UnsubscribeFromFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
         PrintBothDebug("AP Hooks Removed");
         connection.CloseTimer();
+        connection.RemoveHandlers();
     }
 
     private static void UnbeatedShardHandler(float value)

@@ -4,6 +4,7 @@ using Archipelago.MultiClient.Net.Colors;
 using Archipelago.MultiClient.Net.Enums;
 using Archipelago.MultiClient.Net.Exceptions;
 using Archipelago.MultiClient.Net.Helpers;
+using Archipelago.MultiClient.Net.MessageLog.Messages;
 using Archipelago.MultiClient.Net.Packets;
 using Landfall.Haste;
 using Landfall.Haste.Music;
@@ -587,40 +588,54 @@ public class Connection(string hostname, int port)
         UnityMainThreadDispatcher.Instance().log("AP Disconnected");
         ApDebugLog.Instance.DisplayMessage($"AP Disconnected", isDebug:false);
     }
+
+    public void SetupHandlers()
+    {
+        HasteAP.PrintBothDebug("Building socket handlers.");
+        session.Items.ItemReceived += BuildItemReceiver;
+        session.MessageLog.OnMessageReceived += BuildMessageReceiver;
+        session.Socket.ErrorReceived += BuildErrorHandler;
+        session.Socket.PacketReceived += BuildPacketHandler;
+    }
+
+    public void RemoveHandlers()
+    {
+        HasteAP.PrintBothDebug("Removing socket handlers.");
+        session.Items.ItemReceived -= BuildItemReceiver;
+        session.MessageLog.OnMessageReceived -= BuildMessageReceiver;
+        session.Socket.ErrorReceived -= BuildErrorHandler;
+        session.Socket.PacketReceived -= BuildPacketHandler;
+    }
     
-    public void BuildItemReceiver(Action<string, string> GiveItem)
+    public void BuildItemReceiver(ReceivedItemsHelper rih)
     {
         UnityMainThreadDispatcher.Instance().log("Building item receiver");
 
-        session.Items.ItemReceived += (rih) =>
+        try
         {
-            try
-            {
 
-                UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
-                //ApDebugLog.Instance.DisplayMessage("Item Recieved");
-            }
-            catch (Exception e)
-            {
-                UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Error in printing message {e.Message},{e.StackTrace}", duration: 10f, false);
-            }
-            
-            if (IsItSafe())
-            {
-                int copy = rih.Index;
-                UnityMainThreadDispatcher.Instance().log($"Item received of index {copy} and safe to go.");
-                ProcessItem(rih, copy, false);
-            } else
-            {
-                // lambda-capture lookin-ass workaround i swear to god
-                int copy = rih.Index;
-                UnityMainThreadDispatcher.Instance().log($"Enqueing Item of index {copy} to Actions Queue because its not safe.");
-                ApDebugLog.Instance.DisplayMessage($"Enqueing Item of index {copy} to Actions Queue because its not safe.");
-                actions.Enqueue(() => ProcessItem(rih, copy, true));
-            }
-            
-        };
+            UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
+            //ApDebugLog.Instance.DisplayMessage("Item Recieved");
+        }
+        catch (Exception e)
+        {
+            UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Error in printing message {e.Message},{e.StackTrace}", duration: 10f, false);
+        }
+        
+        if (IsItSafe())
+        {
+            int copy = rih.Index;
+            UnityMainThreadDispatcher.Instance().log($"Item received of index {copy} and safe to go.");
+            ProcessItem(rih, copy, false);
+        } else
+        {
+            // lambda-capture lookin-ass workaround i swear to god
+            int copy = rih.Index;
+            UnityMainThreadDispatcher.Instance().log($"Enqueuing Item of index {copy} to Actions Queue because its not safe.");
+            ApDebugLog.Instance.DisplayMessage($"Enqueuing Item of index {copy} to Actions Queue because its not safe.");
+            actions.Enqueue(() => ProcessItem(rih, copy, true));
+        }
     }
 
     private void ProcessItem(ReceivedItemsHelper rih, int index, bool isAsync)
@@ -670,51 +685,40 @@ public class Connection(string hostname, int port)
         session.Socket.SendPacket(packet);
     }
 
-    public void BuildMessageReceiver()
+    public void BuildMessageReceiver(LogMessage message)
     {
-        session.MessageLog.OnMessageReceived += (message) =>
-        {
-            ApDebugLog.Instance.DisplayMessage(message, isDebug: false);
-        };
+        ApDebugLog.Instance.DisplayMessage(message, isDebug: false);
     }
     
     
-    public void BuildErrorHandler()
+    public void BuildErrorHandler(Exception exception, string message)
     {
-        session.Socket.ErrorReceived += (exception, message) =>
-        {
-            HasteAP.PrintBothDebug($"Connection Error Received: {exception.Message}");
+        HasteAP.PrintBothDebug($"Connection Error Received: {exception.Message}");
 
-            if (exception.Message.Contains("closed the WebSocket connection") || exception is ArchipelagoSocketClosedException)
-            {
-                // stop things and try to recover
-                ResetSession();
-                PrepareReconnect();
-            }
-        };
+        if (exception.Message.Contains("closed the WebSocket connection") || exception is ArchipelagoSocketClosedException)
+        {
+            // stop things and try to recover
+            ResetSession();
+            PrepareReconnect();
+        }
     }
 
-    public void BuildPacketHandler()
+    public void BuildPacketHandler(ArchipelagoPacketBase packet)
     {
-        session.Socket.PacketReceived += packet =>
+        if (packet is ConnectedPacket)
         {
-            if (packet is ConnectedPacket)
-            {
-                HasteAP.PrintBothDebug("got a packet, its all good now");
-                AttemptingReconnect = false;
-                HasDisconnected = false;
-            }
-        };
+            HasteAP.PrintBothDebug("got a packet, its all good now");
+            AttemptingReconnect = false;
+            HasDisconnected = false;
+        }
     }
 
     public void ResetSession()
     {
         session = null;
+        RemoveHandlers();
         session = ArchipelagoSessionFactory.CreateSession(hostname, port);
-        BuildItemReceiver(Integration.Integration.GiveItem);
-        BuildMessageReceiver();
-        BuildErrorHandler();
-        BuildPacketHandler();
+        SetupHandlers();
         deathLinkService = session.CreateDeathLinkService();
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f){
 
