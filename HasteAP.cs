@@ -45,9 +45,16 @@ public partial class HasteAP
         // Load everything up when the game starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
         On.GameHandler.LoadMainMenu += StaticLoadMainMenuHook;
+        // TODO: uncomment this when I feel more like testing if it actually works
+        // Application.quitting += ApplicationOnwantsToQuit;
 
     }
-    
+
+    private static void ApplicationOnwantsToQuit()
+    {
+        connection?.RemoveHandlers();
+    }
+
     private static void StaticPlayFromMenuHook(On.GameHandler.orig_PlayFromMenu orig)
     {
 
@@ -93,6 +100,7 @@ public partial class HasteAP
         }
         
         FactSystem.SetFact(new Fact("APSafelyInHub"), 0f);
+        FactSystem.SetFact(new Fact("in_run"), 0f);
 
         connection = new Connection(serverName, serverPort);
 
@@ -706,6 +714,12 @@ public partial class HasteAP
                 break;
         }
 
+        if (ItemDatabase.instance == null)
+        {
+            PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item due to ItemDatabase.instance being null. This item will be re-generated later in the run. Skipping.\nIf you see this error multiple times, you should probably alert the developer of this mod and include your log files.", duration: 10f, isDebug: false, isError:true);
+            return;
+        }
+
         try
         {
             foreach (ItemInstance ii in ItemDatabase.instance.items)
@@ -723,7 +737,7 @@ public partial class HasteAP
 
             if (itemlist.Count == 0)
             {
-                PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item before run start due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
+                PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
                 return;
             }
 
@@ -734,11 +748,17 @@ public partial class HasteAP
                 ItemInstance newitem = ItemDatabase.SelectItemWithRarity(itemlist, rarity, random);
                 if (newitem != null)
                 {
-                    FactSystem.SetFact(new Fact($"{newitem.itemName}_ShowItem"), 1f);
-                    Player.localPlayer.AddItem(newitem);
+                    if (Player.localPlayer != null)
+                    {
+                        Player.localPlayer.AddItem(newitem);
+                    }
+                    else
+                    {
+                        PrintBothDebug($"Could not generate {rarity} {category} item due to Player.localPlayer being null, somehow. This item will be re-generated later in the run.\nIf you see this error multiple times, you should probably alert the developer of this mod and include your log files.", duration: 10f, isDebug: false, isError:true);
+                    }
                 } else
                 {
-                    PrintBothDebug($"Could not generate {rarity} {category} item before run start for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false, isError:true);
+                    PrintBothDebug($"Could not generate {rarity} {category} item for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false, isError:true);
                 }
             }
         }

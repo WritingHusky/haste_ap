@@ -609,8 +609,6 @@ public class Connection(string hostname, int port)
     
     public void BuildItemReceiver(ReceivedItemsHelper rih)
     {
-        UnityMainThreadDispatcher.Instance().log("Building item receiver");
-
         try
         {
 
