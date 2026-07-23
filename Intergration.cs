@@ -35,8 +35,7 @@ namespace Integration
 
         public static void GiveItem(string itemName, string givingPlayerName)
         {
-            UnityMainThreadDispatcher.Instance().log("AP Trying to give (" + itemName + ")");
-            ApDebugLog.Instance.DisplayMessage($"Giving item: {itemName}");
+            HasteAP.PrintBothDebug($"Trying to give item: {itemName}");
             bool worthMentioning = false;
             int? quantity = null;
             NotificationType type = NotificationType.Progression;
@@ -52,8 +51,7 @@ namespace Integration
                         // wincon item, ignore
                         break;
                     case "Progressive Shard":
-                        UnityMainThreadDispatcher.Instance().log("AP Got a Shard!");
-                        ApDebugLog.Instance.DisplayMessage("Got Shard");
+                        HasteAP.PrintBothDebug("Got Progressive Shard!");
                         // Increase the number of shards that the player can use
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Progressive Shard");
@@ -62,82 +60,70 @@ namespace Integration
                         break;
                     case "Shard Shop Filler Item":
                         // 80% sure this item can't actually spawn but I'll keep it here anyway
-                        UnityMainThreadDispatcher.Instance().log("AP Got a filler item");
-                        ApDebugLog.Instance.DisplayMessage("Got Filler");
+                        HasteAP.PrintBothDebug("Got filler item somehow");
                         break;
                     case "Wraith's Hourglass":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Slomo");
-                        ApDebugLog.Instance.DisplayMessage("Got Wraith's Hourglass");
+                        HasteAP.PrintBothDebug("Got Wraith's Hourglass");
                         HasteAP.SecretAbilityUnlock(AbilityKind.Slomo);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Heir's Javelin":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Grapple");
-                        ApDebugLog.Instance.DisplayMessage("Got Heir's Javelin");
+                        HasteAP.PrintBothDebug("Got Heir's Javelin");
                         HasteAP.SecretAbilityUnlock(AbilityKind.Grapple);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Sage's Cowl":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Fly");
-                        ApDebugLog.Instance.DisplayMessage("Got Sage's Cowl");
+                        HasteAP.PrintBothDebug("Got Sage's Cowl");
                         HasteAP.SecretAbilityUnlock(AbilityKind.Fly);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Courier's Board":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Ability Boost");
-                        ApDebugLog.Instance.DisplayMessage("Got Courier's Board");
+                        HasteAP.PrintBothDebug("Got Courier's Board");
                         HasteAP.SecretAbilityUnlock(AbilityKind.BoardBoost);
                         SaveSystem.Save();
                         worthMentioning = true;
                         break;
                     case "Wraith":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Wraith");
-                        ApDebugLog.Instance.DisplayMessage("Got Wraith in hub");
+                        HasteAP.PrintBothDebug("Got Wraith in hub");
                         FactSystem.SetFact(new Fact("APWraithInHub"), 1f);
                         worthMentioning = true;
                         DecideForceReload();
                         break;
                     case "Niada":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Niada");
-                        ApDebugLog.Instance.DisplayMessage("Got Niada in hub");
+                        HasteAP.PrintBothDebug("Got Niada in hub");
                         FactSystem.SetFact(new Fact("APHeirInHub"), 1f);
                         worthMentioning = true;
                         DecideForceReload();
                         break;
                     case "Daro":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Daro");
-                        ApDebugLog.Instance.DisplayMessage("Got Daro in hub");
+                        HasteAP.PrintBothDebug("Got Daro in hub");
                         FactSystem.SetFact(new Fact("APSageInHub"), 1f);
                         worthMentioning = true;
                         DecideForceReload();
                         break;
                     case "The Captain":
-                        UnityMainThreadDispatcher.Instance().log("AP Got The Captain");
-                        ApDebugLog.Instance.DisplayMessage("Got The Captain");
+                        HasteAP.PrintBothDebug("Got The Captain in hub");
                         FactSystem.SetFact(new Fact("APCaptainInHub"), 1f);
                         worthMentioning = true;
                         DecideForceReload();
                         break;
                     case "Fashion Weeboh":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Fashion Weeboh");
-                        ApDebugLog.Instance.DisplayMessage("Got Fashion Weeboh");
+                        HasteAP.PrintBothDebug("Got Fashion Weeboh in hub");
                         FactSystem.SetFact(new Fact("APFashionInHub"), 1f);
                         worthMentioning = true;
                         DecideForceReload();
                         break;
                     case "Progressive Speed Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Progressive Speed Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Progressive Speed Upgrade");
+                        HasteAP.PrintBothDebug("Got Progressive Speed Upgrade");
                         FactSystem.AddToFact(new Fact("APSpeedUpgradesCollected"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Progressive Speed Upgrade");
                         break;
                     case "Max Health Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Max Health Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Max Health Upgrade");
+                        HasteAP.PrintBothDebug("Got Max Health Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxHealth"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Max Health Upgrade");
@@ -145,8 +131,7 @@ namespace Integration
                         ReaddItemStats();
                         break;
                     case "Max Lives Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Extra Lives Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Extra Lives Upgrade");
+                        HasteAP.PrintBothDebug("Got Extra Lives Upgrade");
                         // extra lives upgrade on first get because its coded really weirdly
                         if (FactSystem.GetFact(new Fact("APUpgradeMaxLives")) == 0f) FactSystem.AddToFact(new Fact("APUpgradeMaxLives"), 1f);
                         FactSystem.AddToFact(new Fact("APUpgradeMaxLives"), 1f);
@@ -155,8 +140,7 @@ namespace Integration
                         ReaddItemStats();
                         break;
                     case "Max Energy Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Max Energy Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Max Energy Upgrade");
+                        HasteAP.PrintBothDebug("Got Max Energy Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeMaxEnergy"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Max Energy Upgrade");
@@ -164,8 +148,7 @@ namespace Integration
                         ReaddItemStats();
                         break;
                     case "Sparks in Fragments Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Sparks in Fragments Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Sparks in Fragments Upgrade");
+                        HasteAP.PrintBothDebug("Got Sparks in Fragments Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeLevelSparks"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Sparks in Fragments Upgrade");
@@ -173,8 +156,7 @@ namespace Integration
                         ReaddItemStats();
                         break;
                     case "Item Rarity Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Item Rarity Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Item Rarity Upgrade");
+                        HasteAP.PrintBothDebug("Got Item Rarity Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeItemRarity"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Item Rarity Upgrade");
@@ -182,8 +164,7 @@ namespace Integration
                         ReaddItemStats();
                         break;
                     case "Starting Sparks Upgrade":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Starting Sparks Upgrade");
-                        ApDebugLog.Instance.DisplayMessage("Got Starting Sparks Upgrade");
+                        HasteAP.PrintBothDebug("Got Starting Sparks Upgrade");
                         FactSystem.AddToFact(new Fact("APUpgradeStartingSparks"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Starting Sparks Upgrade");
@@ -191,132 +172,113 @@ namespace Integration
                         ReaddItemStats();
                         break;
                     case "Persistent Common Speed Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Speed Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Common Speed Item");
+                        HasteAP.PrintBothDebug("Got Persistent Common Speed Item");
                         FactSystem.AddToFact(new Fact("APCommonSpeedItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Common Speed Item");
                         ForcePermItem(Rarity.Common, APItemCategory.Speed);
                         break;
                     case "Persistent Common Support Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Support Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Common Support Item");
+                        HasteAP.PrintBothDebug("Got Persistent Common Support Item");
                         FactSystem.AddToFact(new Fact("APCommonSupportItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Common Support Item");
                         ForcePermItem(Rarity.Common, APItemCategory.Support);
                         break;
                     case "Persistent Common Health Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Common Health Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Common Health Item");
+                        HasteAP.PrintBothDebug("Got Persistent Common Health Item");
                         FactSystem.AddToFact(new Fact("APCommonHealthItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Common Health Item");
                         ForcePermItem(Rarity.Common, APItemCategory.Health);
                         break;
                     case "Persistent Rare Speed Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Rare Speed Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Rare Speed Item");
+                        HasteAP.PrintBothDebug("Got Persistent Rare Speed Item");
                         FactSystem.AddToFact(new Fact("APRareSpeedItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Rare Speed Item");
                         ForcePermItem(Rarity.Rare, APItemCategory.Speed);
                         break;
                     case "Persistent Rare Support Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Rare Support Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Rare Support Item");
+                        HasteAP.PrintBothDebug("Got Persistent Rare Support Item");
                         FactSystem.AddToFact(new Fact("APRareSupportItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Rare Support Item");
                         ForcePermItem(Rarity.Rare, APItemCategory.Support);
                         break;
                     case "Persistent Rare Health Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Rare Health Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Rare Health Item");
+                        HasteAP.PrintBothDebug("Got Persistent Rare Health Item");
                         FactSystem.AddToFact(new Fact("APRareHealthItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Rare Health Item");
                         ForcePermItem(Rarity.Rare, APItemCategory.Health);
                         break;
                     case "Persistent Epic Speed Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Epic Speed Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Epic Speed Item");
+                        HasteAP.PrintBothDebug("Got Persistent Epic Speed Item");
                         FactSystem.AddToFact(new Fact("APEpicSpeedItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Epic Speed Item");
                         ForcePermItem(Rarity.Epic, APItemCategory.Speed);
                         break;
                     case "Persistent Epic Support Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Epic Support Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Epic Support Item");
+                        HasteAP.PrintBothDebug("Got Persistent Epic Support Item");
                         FactSystem.AddToFact(new Fact("APEpicSupportItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Epic Support Item");
                         ForcePermItem(Rarity.Epic, APItemCategory.Support);
                         break;
                     case "Persistent Epic Health Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Epic Health Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Epic Health Item");
+                        HasteAP.PrintBothDebug("Got Persistent Epic Health Item");
                         FactSystem.AddToFact(new Fact("APEpicHealthItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Epic Health Item");
                         ForcePermItem(Rarity.Epic, APItemCategory.Health);
                         break;
                     case "Persistent Legendary Item":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Persistent Legendary Item");
-                        ApDebugLog.Instance.DisplayMessage("Got Persistent Legendary Item");
+                        HasteAP.PrintBothDebug("Got Persistent Legendary Item");
                         FactSystem.AddToFact(new Fact("APLegendaryItems"), 1f);
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Legendary Item");
                         ForcePermItem(Rarity.Legendary, APItemCategory.Legendary);
                         break;
                     case "Anti-Spark 10 bundle":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 10 bundle");
-                        ApDebugLog.Instance.DisplayMessage("Got Anti-spark 10");
+                        HasteAP.PrintBothDebug("Got Anti-Spark 10 bundle");
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 10f);
                         break;
                     case "Anti-Spark 100 bundle":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 100 bundle");
-                        ApDebugLog.Instance.DisplayMessage("Got Anti-spark 100");
+                        HasteAP.PrintBothDebug("Got Anti-Spark 100 bundle");
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 100f);
                         break;
                     case "Anti-Spark 250 bundle":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 250 bundle");
-                        ApDebugLog.Instance.DisplayMessage("Got Anti-spark 250");
+                        HasteAP.PrintBothDebug("Got Anti-Spark 250 bundle");
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 250f);
                         break;
                     case "Anti-Spark 500 bundle":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 500 bundle");
-                        ApDebugLog.Instance.DisplayMessage("Got Anti-spark 500");
+                        HasteAP.PrintBothDebug("Got Anti-Spark 500 bundle");
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 500f);
                         break;
                     case "Anti-Spark 750 bundle":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 750 bundle");
-                        ApDebugLog.Instance.DisplayMessage("Got Anti-spark 750");
+                        HasteAP.PrintBothDebug("Got Anti-Spark 750 bundle");
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 750f);
                         break;
                     case "Anti-Spark 1k bundle":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Anti-Spark 1000 bundle");
-                        ApDebugLog.Instance.DisplayMessage("Got Anti-spark 1000");
+                        HasteAP.PrintBothDebug("Got Anti-Spark 1000 bundle");
                         FactSystem.AddToFact(new Fact("meta_progression_resource"), 1000f);
                         break;
                     case "Disaster Trap":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Disaster Trap");
-                        ApDebugLog.Instance.DisplayMessage("Got Disaster Trap");
+                        HasteAP.PrintBothDebug("Got Disaster Trap");
                         FactSystem.AddToFact(new Fact("APQueuedDisasterTraps"), 1f);
                         worthMentioning = true;
                         type = NotificationType.Trap;
                         break;
                     case "Landing Downgrade Trap":
-                        UnityMainThreadDispatcher.Instance().log("AP Got Landing Downgrade Trap");
-                        ApDebugLog.Instance.DisplayMessage("Got Landing Downgrade Trap");
+                        HasteAP.PrintBothDebug("Got Landing Downgrade Trap");
                         FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), 1f);
                         worthMentioning = true;
                         type = NotificationType.Trap;
                         break;
                     default:
-                        UnityMainThreadDispatcher.Instance().logError("Item '" + itemName + "' has no handling");
-                        ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Item '{itemName}' has no handling.\nPlease screenshot this error and send it to the developer of this mod so it can be fixed.", isDebug:false, duration:20f);
+                        HasteAP.PrintBothDebug($"Item '{itemName}' has no handling.\nPlease screenshot this error and send it to the developer of this mod so it can be fixed.", isDebug:false, duration:20f, isError:true);
                         break;
                 }
             }
@@ -324,8 +286,7 @@ namespace Integration
             {
                 if (e.GetType() != typeof(NullReferenceException))
                 {
-                    UnityMainThreadDispatcher.Instance().log($"Error within give item {e.Message},{e.StackTrace}");
-                    ApDebugLog.Instance.DisplayMessage($"Error within give item {e.Message},{e.StackTrace}", duration: 10f);
+                    HasteAP.PrintBothDebug($"Error within give item {e.Message},{e.StackTrace}", duration: 10f);
                 }
             }
             if (worthMentioning) Player.localPlayer.StartCoroutine(ItemPopup(itemName, givingPlayerName, quantity, type));
@@ -409,15 +370,13 @@ namespace Integration
             }
             catch (Exception e)
             {
-                UnityMainThreadDispatcher.Instance().log($"Error within itempopup {e.Message},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"Error within itempopup {e.Message},{e.StackTrace}", duration: 10f);
+                HasteAP.PrintBothDebug($"Error within itempopup {e.Message},{e.StackTrace}", duration: 10f);
             }
         }
 
         public static void GiveDeath(DeathLink death)
         {
-            UnityMainThreadDispatcher.Instance().log("AP DeathLink received");
-            ApDebugLog.Instance.DisplayMessage("Death Received", isDebug:false);
+            HasteAP.PrintBothDebug("Death Received", isDebug:false);
             var cause = "Unknown";
             if (death.Cause != null)
             {
@@ -469,6 +428,9 @@ namespace Integration
             }
             FactSystem.SetFact(new Fact("researcher_in_hub"), 1f);
             FactSystem.SetFact(new Fact("riza_in_hub"), 1f);
+            
+            FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 0f);
+            FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 0f);
             
         }
 

@@ -31,17 +31,31 @@ public partial class HasteAP
 
         UnityMainThreadDispatcher.Instance().log("AP Log created");
         
-        var Build = (new FileInfo(Assembly.GetExecutingAssembly().Location).LastWriteTime).ToShortDateString().GetHashCode().ToString("X");
+        // get the build date from the embedded resources so that I can actually tell versions properly
+        var ass = typeof(HasteAP).Assembly;
+        using (Stream stream = ass.GetManifestResourceStream("Program.Resources.BuildDate.txt"))
+        using (StreamReader reader = new StreamReader(stream))
+        {
+            string result = reader.ReadToEnd();
+            var Build = result.GetHashCode().ToString("X");
+            
+            PrintBothDebug($"Archipelago Installed v{version} ({Build})", isDebug: false);
+        }
         
-        UnityMainThreadDispatcher.Instance().log($"Archipelago Installed v{version} ({Build})");
-        ApDebugLog.Instance.DisplayMessage($"Archipelago Installed v{version} ({Build})", isDebug: false);
 
         // Load everything up when the game starts from menu
         On.GameHandler.PlayFromMenu += StaticPlayFromMenuHook;
         On.GameHandler.LoadMainMenu += StaticLoadMainMenuHook;
+        // TODO: uncomment this when I feel more like testing if it actually works
+        // Application.quitting += ApplicationOnwantsToQuit;
 
     }
-    
+
+    private static void ApplicationOnwantsToQuit()
+    {
+        connection?.RemoveHandlers();
+    }
+
     private static void StaticPlayFromMenuHook(On.GameHandler.orig_PlayFromMenu orig)
     {
 
@@ -62,10 +76,7 @@ public partial class HasteAP
 
         if (!enabledSetting)
         {
-            UnityMainThreadDispatcher.Instance().log("AP not started as it was disabled");
-            ApDebugLog.Instance.DisplayMessage("AP Disabled");
-
-            UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
+            PrintBothDebug("AP not started as it was disabled, transitioning to original actions");
             orig();
             return;
         }
@@ -90,12 +101,12 @@ public partial class HasteAP
         }
         
         FactSystem.SetFact(new Fact("APSafelyInHub"), 0f);
+        FactSystem.SetFact(new Fact("in_run"), 0f);
 
         connection = new Connection(serverName, serverPort);
 
         // This must go BEFORE connection
-        connection.BuildItemReciver(GiveItem);
-        connection.BuildMessageReciver();
+        connection.SetupHandlers();
 
         if (!connection.Connect(username, password, version))
         {
@@ -121,7 +132,7 @@ public partial class HasteAP
                         // compare
                         if (FactSystem.GetFact(new Fact("APRoomSeed")) != seedpart)
                         {
-                            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> The seed of the Archipelago room ({seedpart}) does not match the seed stored in the save data ({FactSystem.GetFact(new Fact("APRoomSeed"))}).\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f);
+                            PrintBothDebug($"The seed of the Archipelago room ({seedpart}) does not match the seed stored in the save data ({FactSystem.GetFact(new Fact("APRoomSeed"))}).\nPlease select the correct save file, or report this to the mod's developer if you believe this is in error.", isDebug: false, duration: 20f, isError:true);
                             connection.Close();
                             connection = null;
                             return;
@@ -140,7 +151,7 @@ public partial class HasteAP
         }
         catch (Exception e)
         {
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not get or convert the AP room seed ({connection?.session.RoomState.Seed}) and cannot perform AP savedata verification.\nThe game will continue, but be very careful that you are playing on the correct savefile when playing with this AP host.", isDebug: false, duration: 20f);
+            PrintBothDebug($"Could not get or convert the AP room seed ({connection?.session.RoomState.Seed}) and cannot perform AP savedata verification.\nThe game will continue, but be very careful that you are playing on the correct savefile when playing with this AP host.", isDebug: false, duration: 20f, isError:true);
         }
         ApDebugLog.Instance.DisplayMessage("Connected");
 
@@ -169,8 +180,7 @@ public partial class HasteAP
         
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
-            UnityMainThreadDispatcher.Instance().log("AP DeathLink is Enabled");
-            ApDebugLog.Instance.DisplayMessage("Deathlink Enabled");
+            PrintBothDebug("Deathlink is Enabled");
 
             connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
 
@@ -196,6 +206,7 @@ public partial class HasteAP
         On.Player.Die += StaticRemoveTrapsOnDeath;
         On.PlayerCharacter.AddEnergy += StaticOnEnergyGain;
         On.Player.SetEnergy += StaticOnSetEnergy;
+        On.PlayerProgress.SetShardComplete += StaticOnShardComplete;
 
         On.GM_API.OnEndBossWin += StaticEndBossHook;
         On.EndBoss.GoToMainMenu += StaticEndBossForceDC;
@@ -237,11 +248,10 @@ public partial class HasteAP
         
         connection.SetTimer();
         
-        UnityMainThreadDispatcher.Instance().log("AP Transitioning to original actions");
-        ApDebugLog.Instance.DisplayMessage("Loading normally now");
+
+        PrintBothDebug("Transitioning to original actions");
         orig();
     }
-
 
     /// <summary>
     /// Extra function to remove hooks on exiting the game, so that new hooks arent accidentally installed ontop of existing ones
@@ -255,6 +265,7 @@ public partial class HasteAP
         On.Player.Die -= StaticRemoveTrapsOnDeath;
         On.PlayerCharacter.AddEnergy -= StaticOnEnergyGain;
         On.Player.SetEnergy -= StaticOnSetEnergy;
+        On.PlayerProgress.SetShardComplete -= StaticOnShardComplete;
         On.GM_API.OnEndBossWin -= StaticEndBossHook;
         On.GM_API.OnBossDeath -= StaticBossDeathHook;
         On.EndBoss.GoToMainMenu -= StaticEndBossForceDC;
@@ -288,17 +299,17 @@ public partial class HasteAP
         }
         FactSystem.UnsubscribeFromFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
         FactSystem.UnsubscribeFromFact(new Fact("Current_UnlockedAscensionLevel"), UnbeatedDisasterShardHandler);
-        UnityMainThreadDispatcher.Instance().log("AP Hooks Removed");
-        ApDebugLog.Instance.DisplayMessage("AP Hooks Removed");
+        PrintBothDebug("AP Hooks Removed");
         connection.CloseTimer();
+        connection.RemoveHandlers();
     }
 
     private static void UnbeatedShardHandler(float value)
     {
-        ApDebugLog.Instance.DisplayMessage($"unbeaten shard update to (zero index){value}");
+        PrintBothDebug($"unbeaten shard update to (zero index){value}");
         if (connection == null)
             return;
-
+        
         var shard_count = connection.GetItemCount("Progressive Shard");
         // make sure to cap the current_unbeaten to the correct value so that the extra Prog Shards dont make a bug happen with an invalid state
         var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 9 : Math.Min(FactSystem.GetFact(new Fact("APShardGoal")), 10) - 1f;
@@ -307,13 +318,22 @@ public partial class HasteAP
         {
             var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated")));
             // if unlock-order is Boss-locked, then only unlock up until the lowest of either bossbeated or shards
-            if (value != newvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(newvalue, shard_cap));
+            var desiredvalue = Math.Min(newvalue, shard_cap);
+            if (value != desiredvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), desiredvalue);
         }
         else
         {
-            if (value != shard_count) FactSystem.SetFact(new Fact("current_unbeaten_shard"), Math.Min(shard_count, shard_cap));
+            var desiredvalue = Math.Min(shard_count, shard_cap);
+            if (value != desiredvalue) FactSystem.SetFact(new Fact("current_unbeaten_shard"), desiredvalue);
         }
     }
+    
+    private static void StaticOnShardComplete(On.PlayerProgress.orig_SetShardComplete orig, int shardID)
+    {
+        // cut-down version of the old function so it doesnt touch the _in_hub facts and apparently annihilate the game???
+        PlayerProgress.CurrentUnlockedShard = shardID + 1;
+    }
+
 
     private static void UnbeatedDisasterShardHandler(float value)
     {
@@ -454,8 +474,7 @@ public partial class HasteAP
     /// </summary>
     private static void StaticLoadHubHook(On.GM_API.orig_OnSpawnedInHub orig)
     {
-        UnityMainThreadDispatcher.Instance().log("AP Loading into Hub");
-        ApDebugLog.Instance.DisplayMessage("Loaded into hub");
+        PrintBothDebug("Loading into Hub");
         FactSystem.SetFact(new Fact("APSafelyInHub"), 1f);
 
         UpdateShardCount();
@@ -479,11 +498,18 @@ public partial class HasteAP
     {
         if (connection != null)
         {
-            ClearHooks();
-            connection.Close();
-            connection = null;
-            ApDebugLog.Instance.DisplayMessage("Removed connection");
-            FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
+            try
+            {
+                ClearHooks();
+                connection.Close();
+                connection = null;
+                PrintBothDebug("Removed connection");
+                FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
+            }
+            catch (Exception e)
+            {
+                PrintBothDebug($"Error in loading main menu: {e.Message}", isError:true);
+            }
         }
 
         orig();
@@ -497,7 +523,7 @@ public partial class HasteAP
     {
         if (connection == null)
         {
-            ApDebugLog.Instance.DisplayMessage("AP On Complete Run the connection is null");
+            PrintBothDebug("On Complete Run the connection is null");
             return;
         }
         ApDebugLog.Instance.DisplayMessage("Run Complete");
@@ -520,7 +546,7 @@ public partial class HasteAP
     {
         if (connection == null)
         {
-            ApDebugLog.Instance.DisplayMessage("AP On Fragment Clear the connection is null");
+            PrintBothDebug("On Fragment Clear the connection is null");
             return;
         }
         // make sure youre actually in a fragment, not a rest/shop/challenge
@@ -586,12 +612,12 @@ public partial class HasteAP
     {
         orig();
         // eval
-        UnityMainThreadDispatcher.Instance().log($"Start of fragment, evaluating traps");
-        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
+        PrintBothDebug($"Start of fragment, evaluating traps");
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f)
         {
             RemoveTrap(TrapsList.Disaster);
         }
-        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
         {
             ActivateTrap(TrapsList.Disaster);
         }
@@ -601,41 +627,35 @@ public partial class HasteAP
         }
 
 
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f)
         {
             RemoveTrap(TrapsList.Landing);
         }
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
         {
             ActivateTrap(TrapsList.Landing);
-        }
-        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f)
-        {
-            FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
         }
     }
 
     private static void ActivateTrap(TrapsList traptype)
     {
-        UnityMainThreadDispatcher.Instance().log($"Attempting to activate trap {traptype}");
+        PrintBothDebug($"Attempting to activate trap {traptype}");
         switch (traptype)
         {
             case TrapsList.Disaster:
                 // i betcha there'll be some dumb shit i'm gonna need to fix when I eventually add the disaster shards as goals
-                if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) == 0f)
+                if (FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 0f)
                 {
                     UnityMainThreadDispatcher.Instance().log($"Attempting to add disaster trap");
-                    FactSystem.SetFact(new Fact("APDisasterTrapActive"), 1f);
                     FactSystem.SetFact(new Fact("APDisasterTrapIsActive"), 1f);
                     ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
                     Player.localPlayer.AddItem(DisasterItem);
                 }
                 break;
             case TrapsList.Landing:
-                if (FactSystem.GetFact(new Fact("APLandingTrapActive")) == 0f)
+                if (FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 0f)
                 {
                     UnityMainThreadDispatcher.Instance().log($"Attempting to add landing trap");
-                    FactSystem.SetFact(new Fact("APLandingTrapActive"), 1f);
                     FactSystem.SetFact(new Fact("APLandingTrapIsActive"), 1f);
                 }
                 break;
@@ -646,20 +666,30 @@ public partial class HasteAP
 
     private static void DecrementTraps()
     {
-        UnityMainThreadDispatcher.Instance().log($"Decrementing traps");
-        if (FactSystem.GetFact(new Fact("APDisasterTrapActive")) >= 1f)
+        PrintBothDebug($"Decrementing traps");
+        if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) >= 1f && FactSystem.GetFact(new Fact("APDisasterTrapIsActive")) == 1f)
         {
-            FactSystem.AddToFact(new Fact("APDisasterTrapActive"), -1f);
+            FactSystem.AddToFact(new Fact("APQueuedDisasterTraps"), -1f);
+            if (FactSystem.GetFact(new Fact("APQueuedDisasterTraps")) == 0f)
+            {
+                RemoveTrap(TrapsList.Disaster);
+            }
+            PrintBothDebug($"You have {FactSystem.GetFact(new Fact("APQueuedDisasterTraps"))} Disaster Traps remaining.", isDebug:false);
         }
-        if (FactSystem.GetFact(new Fact("APLandingTrapActive")) >= 1f)
+        if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) >= 1f && FactSystem.GetFact(new Fact("APLandingTrapIsActive")) == 1f)
         {
-            FactSystem.AddToFact(new Fact("APLandingTrapActive"), -1f);
+            FactSystem.AddToFact(new Fact("APQueuedLandingTraps"), -1f);
+            if (FactSystem.GetFact(new Fact("APQueuedLandingTraps")) == 0f)
+            {
+                RemoveTrap(TrapsList.Landing);
+            }
+            PrintBothDebug($"You have {FactSystem.GetFact(new Fact("APQueuedLandingTraps"))} Landing Traps remaining.", isDebug:false);
         }
     }
 
     private static void RemoveTrap(TrapsList traptype)
     {
-        UnityMainThreadDispatcher.Instance().log($"Attempting to remove trap {traptype}");
+        PrintBothDebug($"Attempting to remove trap {traptype}");
         try
         {
             switch (traptype)
@@ -678,8 +708,7 @@ public partial class HasteAP
         }
         catch (Exception e)
         {
-            UnityMainThreadDispatcher.Instance().log($"Error in removing {traptype} traps: {e.Message},{e.InnerException},{e.StackTrace}");
-            ApDebugLog.Instance.DisplayMessage($"\nError in removing {traptype} traps:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
+            PrintBothDebug($"\nError in removing {traptype} traps:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false, isError:true);
         }
     }
 
@@ -721,39 +750,60 @@ public partial class HasteAP
                 break;
         }
 
-        foreach (ItemInstance ii in ItemDatabase.instance.items)
+        if (ItemDatabase.instance == null)
         {
-            // legendary items dont have an exclusion table, and just get them all
-            if (category != APItemCategory.Legendary) {
-                if (!referenceTable.Contains(ii.itemName)) { continue; }
-            }
-            if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPersistentItems")) == 2f) { continue; }
-            if (ItemDatabase.ItemIsAcceptable(ii, TagInteraction.None, null, GetRandomItemFlags.Major, null))
-            {
-                itemlist.Add(ii);
-            }
-        }
-
-        if (itemlist.Count == 0)
-        {
-            ApDebugLog.Instance.DisplayMessage($"<color=#FFFF00>WARNING:</color> Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item before run start due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false);
+            PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item due to ItemDatabase.instance being null. This item will be re-generated later in the run. Skipping.\nIf you see this error multiple times, you should probably alert the developer of this mod and include your log files.", duration: 10f, isDebug: false, isError:true);
             return;
         }
 
-        // loop for q, select q items and add to player
-        System.Random random = new();
-        for (int i = 0; i < (int)q; i++)
+        try
         {
-            ItemInstance newitem = ItemDatabase.SelectItemWithRarity(itemlist, rarity, random);
-            if (newitem != null)
+            foreach (ItemInstance ii in ItemDatabase.instance.items)
             {
-                FactSystem.SetFact(new Fact($"{newitem.itemName}_ShowItem"), 1f);
-                Player.localPlayer.AddItem(newitem);
-            } else
+                // legendary items dont have an exclusion table, and just get them all
+                if (category != APItemCategory.Legendary) {
+                    if (!referenceTable.Contains(ii.itemName)) { continue; }
+                }
+                if (ii.triggerType == ItemTriggerType.Active && FactSystem.GetFact(new Fact("APPersistentItems")) == 2f) { continue; }
+                if (ItemDatabase.ItemIsAcceptable(ii, TagInteraction.None, null, GetRandomItemFlags.Major, null))
+                {
+                    itemlist.Add(ii);
+                }
+            }
+
+            if (itemlist.Count == 0)
             {
-                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not generate {rarity} {category} item before run start for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false);
+                PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
+                return;
+            }
+
+            // loop for q, select q items and add to player
+            System.Random random = new();
+            for (int i = 0; i < (int)q; i++)
+            {
+                ItemInstance newitem = ItemDatabase.SelectItemWithRarity(itemlist, rarity, random);
+                if (newitem != null)
+                {
+                    if (Player.localPlayer != null)
+                    {
+                        Player.localPlayer.AddItem(newitem);
+                    }
+                    else
+                    {
+                        PrintBothDebug($"Could not generate {rarity} {category} item due to Player.localPlayer being null, somehow. This item will be re-generated later in the run.\nIf you see this error multiple times, you should probably alert the developer of this mod and include your log files.", duration: 10f, isDebug: false, isError:true);
+                    }
+                } else
+                {
+                    PrintBothDebug($"Could not generate {rarity} {category} item for a reason unrelated to item pool size.\nYou should probably report this to the developer of the mod.", duration: 10f, isDebug: false, isError:true);
+                }
             }
         }
+        catch (Exception e)
+        {
+            PrintBothDebug($"!!!PLEASE SHOW THIS TO THE DEV!!!: Error in generating persistent {rarity} {category}:\n {e.Message}, {e.InnerException}, {e.StackTrace}", duration: 15f, isDebug:false, isError:true);
+        }
+        
+        
     }
 
     public static void SetFragmentLimits(string keyword)
@@ -824,7 +874,7 @@ public partial class HasteAP
                         }
                         else
                         {
-                            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Could not find APShopItem in ItemDatabase, wtf is happening here.", isDebug:false);
+                            PrintBothDebug($"Could not find APShopItem in ItemDatabase, wtf is happening here.", isDebug:false, isError:true);
                         }
                     }
                     else
@@ -841,8 +891,7 @@ public partial class HasteAP
             }
             catch (Exception e)
             {
-                UnityMainThreadDispatcher.Instance().log($"Error in generating shop items {e.Message},{e.InnerException},{e.StackTrace}");
-                ApDebugLog.Instance.DisplayMessage($"\nError in generating shop items:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false);
+                PrintBothDebug($"\nError in generating shop items:\n {e.Message},{e.InnerException},{e.StackTrace}", duration: 10f, isDebug:false, isError:true);
             }
 
             
@@ -861,7 +910,7 @@ public partial class HasteAP
     {
         if (connection == null)
         {
-            ApDebugLog.Instance.DisplayMessage("AP On Get Item the connection is null");
+            PrintBothDebug("On Get Item the connection is null");
             return;
         }
         var item_location = "";
@@ -906,9 +955,7 @@ public partial class HasteAP
 
         if (canSend)
         {
-            UnityMainThreadDispatcher.Instance().log($"AP sending Item: ({item_location})");
-            ApDebugLog.Instance.DisplayMessage("Bought Item");
-
+            PrintBothDebug("Bought Item at " + item_location);
             connection.SendLocation(item_location);
         }
 
@@ -960,8 +1007,7 @@ public partial class HasteAP
 
         var boss_location = $"Shard {currentShard} Boss";
         if (currentDisaster > 0) boss_location = $"Disaster Shard {currentDisaster} Boss";
-        UnityMainThreadDispatcher.Instance().log("AP sending Boss: (" + boss_location + ")");
-        ApDebugLog.Instance.DisplayMessage("Boss Defeated");
+        PrintBothDebug($"Boss Defeated at {boss_location}");
 
         if (currentShard == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal")))){
             ApDebugLog.Instance.DisplayMessage("Game Complete");
@@ -1012,19 +1058,18 @@ public partial class HasteAP
 
         if (connection == null)
         {
-            ApDebugLog.Instance.DisplayMessage("AP On Progession Unlock the connection is null");
+            PrintBothDebug("On Progession Unlock the connection is null");
             return;
         }
 
         if (self.Character == null)
         {
-            ApDebugLog.Instance.DisplayMessage("The 'Character' field is null or not of type InteractionCharacter.");
+            PrintBothDebug("The 'Character' field is null or not of type InteractionCharacter.");
             return;
         }
         var ability_name = Enum.GetName(typeof(AbilityKind), self.Character.Ability);
         var ability_location = $"{GetAbilityName(ability_name)} Purchase";
-        UnityMainThreadDispatcher.Instance().log("AP sending Ability: (" + ability_location + ")");
-        ApDebugLog.Instance.DisplayMessage($"Ability Got: {ability_name}");
+        PrintBothDebug("Sending Ability Location: (" + ability_location + ")");
         var cost = MetaProgression.Instance.GetEntry(self.Character.Ability).cost;
         MetaProgression.AddResource(-cost);
 
@@ -1039,7 +1084,7 @@ public partial class HasteAP
     {
         if (connection == null)
         {
-            ApDebugLog.Instance.DisplayMessage("AP On Meta Progression Row UI the connection is null");
+            PrintBothDebug("AP On Meta Progression Row UI the connection is null");
             return;
         }
         // this is basically just the decompiled original code with added jank lmao
@@ -1185,11 +1230,19 @@ public partial class HasteAP
             Amount.gameObject.SetActive(false);
 
             var rowText = StatType.gameObject.GetComponent<TextMeshProUGUI>();
-            //ApDebugLog.Instance.DisplayMessage($"chaning data for row {rowText.text} of obj {rowText.GetInstanceID()}");
+            //ApDebugLog.Instance.DisplayMessage($"changing data for row {rowText.text} of obj {rowText.GetInstanceID()}");
 
-
-            var locationData = connection.RetrieiveLocationData(GetCaptainUpgradeName(self.kind.ToString(), Math.Min(self._entry.CurrentLevel, self._entry.levels.Length-2)));
-            rowText.text = $"{locationData.Item1} for {locationData.Item2}";
+            if (self._entry.CurrentLevel > self._entry.levels.Length-2)
+            {
+                rowText.text = $"SOLD OUT";
+            }
+            else
+            {
+                var caplocname = GetCaptainUpgradeName(self.kind.ToString(), Math.Min(self._entry.CurrentLevel, self._entry.levels.Length-2));
+                var locationData = connection.RetrieveLocationData(caplocname);
+                connection.SendHintedLocation(caplocname);
+                rowText.text = $"{locationData.Item1} for {locationData.Item2}";
+            }
             rowText.rectTransform.offsetMax = new Vector2(-248f, rowText.rectTransform.offsetMax.y);
             //ApDebugLog.Instance.DisplayMessage($"changes complete for {rowText.text} of obj {rowText.GetInstanceID()}");
         }
@@ -1199,7 +1252,7 @@ public partial class HasteAP
     {
         if (connection == null)
         {
-            ApDebugLog.Instance.DisplayMessage("AP On Skin Purchase the connection is null");
+            PrintBothDebug("On Skin Purchase the connection is null");
             return;
         }
         if (FactSystem.GetFact(new Fact("APFashionPurchases")) >= 1f)
@@ -1216,10 +1269,12 @@ public partial class HasteAP
         {
             if (connection == null)
             {
-                ApDebugLog.Instance.DisplayMessage("AP On Skin Popup Open the connection is null");
+                PrintBothDebug("On Skin Popup Open the connection is null");
                 return;
             };
-            var locationData = connection.RetrieiveLocationData($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
+            var faslocname = $"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}";
+            var locationData = connection.RetrieveLocationData(faslocname);
+            connection.SendHintedLocation(faslocname);
             self.headerLabel.text = $"{locationData.Item1} for {locationData.Item2}";
         }
     }
@@ -1253,7 +1308,7 @@ public partial class HasteAP
 
         if (initField.GetValue(self) is not bool init)
         {
-            ApDebugLog.Instance.DisplayMessage("The 'Character' field is null or not of type InteractionCharacter.");
+            PrintBothDebug("The 'Character' field is null or not of type InteractionCharacter.");
             return;
         }
 
@@ -1295,6 +1350,22 @@ public partial class HasteAP
         }
         if (!connection!.IsLocationChecked($"{GetAbilityName(abilityName)} Purchase") || self.character.name == "Captain") orig(self);
     }
+    
+    
+    public static void PrintBothDebug(string message, float duration = -1f, bool isDebug = true, bool isError = false)
+    {
+        if (isError)
+        {
+            UnityMainThreadDispatcher.Instance().logError($"AP {message}");
+            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> {message}", duration, false);
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP {message}");
+            ApDebugLog.Instance.DisplayMessage(message, duration, isDebug);
+        }
+    }
+
 
 
 
@@ -1351,6 +1422,25 @@ public partial class HasteAP
         if (connection.GetItemCount("Heir's Javelin") > 0) SecretAbilityUnlock(AbilityKind.Grapple);
         if (connection.GetItemCount("Sage's Cowl") > 0) SecretAbilityUnlock(AbilityKind.Fly);
         if (connection.GetItemCount("Courier's Board") > 0) SecretAbilityUnlock(AbilityKind.BoardBoost);
+        if (FactSystem.GetFact(new Fact("APStartingAbility")) > 0f)
+        {
+            switch (FactSystem.GetFact(new Fact("APStartingAbility")))
+            {
+                case 1f:
+                    SecretAbilityUnlock(AbilityKind.BoardBoost);
+                    break;
+                case 2f:
+                    SecretAbilityUnlock(AbilityKind.Slomo);
+                    break;
+                case 3f:
+                    SecretAbilityUnlock(AbilityKind.Grapple);
+                    break;
+                case 4f:
+                    SecretAbilityUnlock(AbilityKind.Fly);
+                    break;
+
+            }
+        }
         
         // hub NPCs
         if (connection.GetItemCount("Wraith") > 0) FactSystem.SetFact(new Fact("APWraithInHub"), 1);
@@ -1404,6 +1494,19 @@ public partial class HasteAP
         connection.SendLocation(loc);
     }
     
+    [ConsoleCommand]
+    public static void WhatTheDogDoin()
+    {
+        UnityMainThreadDispatcher.Instance()
+            .log($"AP connection data: DC:{connection.HasDisconnected} AR:{connection.AttemptingReconnect}");
+    }
+    
+    [ConsoleCommand]
+    public static void ForceReconnection()
+    {
+        connection.AttemptingReconnect = false;
+        connection.PrepareReconnect();
+    }
     
     [ConsoleCommand]
     public static void ImportSaveData(string path)
@@ -1603,6 +1706,25 @@ public class ApPasswordSetting : StringSetting, IExposedSetting
 }
 
 [HasteSetting]
+public class ApHubScoutSetting : EnumSetting<HubScoutMode>, IExposedSetting
+{
+    public override void ApplyValue()
+    {
+        UnityMainThreadDispatcher.Instance().log($"AP Changed Hub Scout to {Value}");
+    }
+
+    //TODO: switch this to Yaml once the new version releases
+    protected override HubScoutMode GetDefaultValue() => HubScoutMode.Enabled;
+    public override List<LocalizedString> GetLocalizedChoices() => [
+        new UnlocalizedString("Enabled"), 
+        new UnlocalizedString("Disabled"), 
+        // new UnlocalizedString("Inherit from Yaml"),
+    ];
+    public LocalizedString GetDisplayName() => new UnlocalizedString("Scout Hub Purchase locations");
+    public string GetCategory() => "AP";
+}
+
+[HasteSetting]
 public class ApSendDeathModeSetting : EnumSetting<DeathLinkMode>, IExposedSetting
 {
     public override void ApplyValue()
@@ -1640,4 +1762,10 @@ public class ApReceiveDeathModeSetting : EnumSetting<DeathLinkMode>, IExposedSet
 public enum DeathLinkMode
 {
     OnShardFail, OnDeath
+}
+
+//TODO: add the yaml option when v0.5 comes out
+public enum HubScoutMode
+{
+    Enabled, Disabled
 }

@@ -21,6 +21,7 @@ namespace StoryFlags
             "TutorialPopUp_Played_CompletedFirstShard",
             "played_OpenItemRemoval",
             "has_met_animal_fashion",
+            "Time_Travel_Done",
 
             // Story conversations
             "played_04_Main_SecondRun_Heir",
