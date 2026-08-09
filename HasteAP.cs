@@ -5,6 +5,7 @@ using Landfall.Modding;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using Program;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Localization;
@@ -18,7 +19,7 @@ public partial class HasteAP
 {
     private static Connection? connection;
 
-    private static readonly Version version = new(0, 4, 0);
+    private static readonly Version version = new(0, 5, 0);
 
     static HasteAP()
     {
@@ -159,7 +160,6 @@ public partial class HasteAP
 
 
         FactSystem.SetFact(new Fact("APForceReloadFirstLoad"), 0f);
-        SetHubState();
         for (int i = 1; i <= 14; i++)
         {
             SetFragmentLimits("Shard"+i);
@@ -169,10 +169,18 @@ public partial class HasteAP
         FactSystem.SubscribeToFact(new Fact("current_unbeaten_shard"), UnbeatedShardHandler);
         FactSystem.SubscribeToFact(new Fact("Current_UnlockedAscensionLevel"), UnbeatedDisasterShardHandler);
 
+        // if (FactSystem.GetFact(new Fact("APFashionPurchases")) >= 2f)
+        // {
+        //     FactSystem.SubscribeToFact(new Fact("skin_status_blue"), UnbeatedShardHandler);
+        // }
+
         // only need to bother with this once a savefile
         if (FactSystem.GetFact(new Fact("APFirstLoad")) == 0f)
         {
             ClearStoryFlags();
+            FactSystem.SetFact(new Fact("APBossDefeated"), FactSystem.GetFact(new Fact("APStartingShard")) - 1);
+            // if goal > 10, also remove the credits
+            if (FactSystem.GetFact(new Fact("APShardGoal")) > 10) FactSystem.SetFact(new Fact("Has_Won_Game"), 1f);
         }
         FactSystem.SetFact(new Fact("APFirstLoad"), 1f);
 
@@ -247,6 +255,7 @@ public partial class HasteAP
         On.GM_API.OnSpawnedInHub += StaticLoadHubHook;
         
         connection.SetTimer();
+        SetHubState();
         
 
         PrintBothDebug("Transitioning to original actions");
@@ -312,7 +321,7 @@ public partial class HasteAP
         
         var shard_count = connection.GetItemCount("Progressive Shard");
         // make sure to cap the current_unbeaten to the correct value so that the extra Prog Shards dont make a bug happen with an invalid state
-        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 9 : Math.Min(FactSystem.GetFact(new Fact("APShardGoal")), 10) - 1f;
+        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 10 : Math.Min(FactSystem.GetFact(new Fact("APShardGoal")), 10);
         // Never allow the value to be not what I want it to be
         if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
         {
@@ -337,20 +346,20 @@ public partial class HasteAP
 
     private static void UnbeatedDisasterShardHandler(float value)
     {
-        ApDebugLog.Instance.DisplayMessage($"unbeaten disaster shard update to (zero index){value}");
+        PrintBothDebug($"unbeaten disaster shard update to (zero index){value}");
         if (connection == null)
             return;
         
-        var shard_count = connection.GetItemCount("Progressive Shard") - 10;
-        
+        var shard_count = connection.GetItemCount("Progressive Shard") - 9;
+
         if (shard_count < 0)
-            return;
+            shard_count = 0;
         
-        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 4 : FactSystem.GetFact(new Fact("APShardGoal"));
+        var shard_cap = FactSystem.GetFact(new Fact("APRemovePVL")) == 0f ? 4 : FactSystem.GetFact(new Fact("APShardGoal")) - 10;
         
         if (FactSystem.GetFact(new Fact("APShardUnlockOrder")) == 1f)
         {
-            var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated"))-10);
+            var newvalue = Math.Min(shard_count, (int)FactSystem.GetFact(new Fact("APBossDefeated"))-9);
             // if unlock-order is Boss-locked, then only unlock up until the lowest of either bossbeated or shards
             if (value != newvalue) FactSystem.SetFact(new Fact("Current_UnlockedAscensionLevel"), Math.Min(newvalue, shard_cap));
         }
@@ -555,13 +564,15 @@ public partial class HasteAP
         {
             string? locationName; // location to send
             string? FragKeyword; // suffix to put on everything
+            int currentShard = 0;
             if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 1f)
             {
-                var currentShard = RunHandler.RunData.shardID + 1;
+                currentShard = RunHandler.RunData.shardID + 1;
                 if (RunHandler.RunData.runConfig.ascensionLevel > 0)
                 {
                     locationName = $"Disaster Shard {RunHandler.RunData.runConfig.ascensionLevel} Fragment Clear ";
                     FragKeyword = "Shard" + (10 + RunHandler.RunData.runConfig.ascensionLevel);
+                    currentShard += RunHandler.RunData.runConfig.ascensionLevel;
                 }
                 else
                 {
@@ -575,7 +586,9 @@ public partial class HasteAP
                 FragKeyword = "Global";
             }
 
-            if (FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword)) < FactSystem.GetFact(new Fact("APFragmentsanityQuantity")))
+            float quan = GetFragmentQuantity(currentShard);
+
+            if (FactSystem.GetFact(new Fact("APFragmentsanityLocation" + FragKeyword)) < quan && currentShard >= FactSystem.GetFact(new Fact("APStartingShard")))
             {
                 FactSystem.AddToFact(new Fact("APFragmentsanity" + FragKeyword), 1f);
                 // bonus point for S-Rank
@@ -725,6 +738,7 @@ public partial class HasteAP
         GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Support, FactSystem.GetFact(new Fact("APEpicSupportItems")));
         GenerateRandomStartingItems(Rarity.Epic, APItemCategory.Health, FactSystem.GetFact(new Fact("APEpicHealthItems")));
         GenerateRandomStartingItems(Rarity.Legendary, APItemCategory.Legendary, FactSystem.GetFact(new Fact("APLegendaryItems")));
+        SetBaseDisaster(FactSystem.GetFact(new Fact("APBaseDisasterLevel")));
         FactSystem.SetFact(new Fact("APSafelyInHub"), 0f);
         orig();
     }
@@ -806,6 +820,69 @@ public partial class HasteAP
         
     }
 
+    private static void SetBaseDisaster(float d)
+    {
+        if (d == 0) return;
+        // get current shard's disaster level
+        var disasterlevel = RunHandler.RunData.runConfig.ascensionLevel;
+
+        // d4 always has all 4 effects, so never add our own
+        if (disasterlevel == 4) return;
+        if (d == 4)
+        {
+            ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level4").ToList()[0];
+            Player.localPlayer.AddItem(DisasterItem);
+        }
+        // for the rest, add each level until the base disaster level
+        if (disasterlevel == 3) return;
+        if (d >= 3)
+        {
+            ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level3").ToList()[0];
+            Player.localPlayer.AddItem(DisasterItem);
+        }
+        if (disasterlevel == 2) return;
+        if (d >= 2)
+        {
+            ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level2").ToList()[0];
+            Player.localPlayer.AddItem(DisasterItem);
+        }
+        if (disasterlevel == 1) return;
+        if (d >= 1)
+        {
+            ItemInstance DisasterItem = ItemDatabase.instance.items.Where(x => x.itemName == "MinorItem_Ascension_Level1").ToList()[0];
+            Player.localPlayer.AddItem(DisasterItem);
+        }
+
+    }
+    
+    public static int GetFragmentQuantity(int shard)
+    {
+        
+        if (FactSystem.GetFact(new Fact("APFragmentsanityPerShardScaling")) == 2f && FactSystem.GetFact(new Fact("APFragmentsanity")) == 1f)
+        {
+            // lookup shard length from table, multiply it by dynamic quan
+            float ratio = FactSystem.GetFact(new Fact("APFragmentsanityDynamicQuantity")) / 100;
+            return (int)Math.Floor(LookupTables.LookupTable.ShardLengths[shard-1] * ratio);
+        }
+
+        return (int)FactSystem.GetFact(new Fact("APFragmentsanityQuantity"));
+
+    }
+    
+    public static int GetShopQuantity(int shard)
+    {
+        
+        if (FactSystem.GetFact(new Fact("APShopsanityPerShardScaling")) == 2f && FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
+        {
+            // lookup shard length from table, multiply it by dynamic quan
+            float ratio = FactSystem.GetFact(new Fact("APShopsanityDynamicQuantity")) / 100;
+            return (int)Math.Floor(Math.Floor((double)(LookupTables.LookupTable.ShardLengths[shard-1] / 2)) * ratio);
+        }
+
+        return (int)FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+
+    }
+
     public static void SetFragmentLimits(string keyword)
     {
         if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) == 2f)
@@ -857,14 +934,44 @@ public partial class HasteAP
                 {
                     self.Unset(i);
                 }
+                
+                // for RSIWD, get the current shard's quantity and compare it to the current progress
+                // if the quan and progress match, then override inX
+                bool inXOverride = false;
+                if (FactSystem.GetFact(new Fact("APRemoveShopItemsWhenDone")) == 1f)
+                {
+                    if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
+                    {
+                        if (FactSystem.GetFact(new Fact("APShopsanityBlockers")) == 1f)
+                        {
+                            if (Math.Floor(FactSystem.GetFact(new Fact("APShopsanityGlobal")) / 15) <= FactSystem.GetFact(new Fact("APShopsanityBlockersFound")))
+                            {
+                                inXOverride = FactSystem.GetFact(new Fact("APShopsanityGlobal")) > FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                            }
+                            else
+                            {
+                                // always override if the player doesnt have enough blocker items
+                                inXOverride = true;
+                            }
+                        }
+                        else
+                        {
+                            inXOverride = FactSystem.GetFact(new Fact("APShopsanityGlobal")) > FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                        }
+                    }
+                    else if (FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
+                    {
+                        var currentShard = RunHandler.RunData.shardID + 1 + RunHandler.RunData.runConfig.ascensionLevel;
+                        inXOverride = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) > GetShopQuantity(currentShard);
+                    }
+                }
 
                 for (int j = 0; j < 3; j++)
                 {
                     ItemInstance? itemToAddToShop = null;
                     System.Random random = new System.Random();
-                    //TODO: determine if there are no AP items left in that region, then make it spawn a normal item instead
-                    // unless the inX is 100, then just let them keep getting useless items I guess (maybe another dummy item)
-                    int inX = (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
+                    int inX = inXOverride ? 0 : (int)FactSystem.GetFact(new Fact("APShopsanitySeperateRate"));
+                    
                     if (random.Next(1, 100) <= inX)
                     {
                         var ItemsThatShouldBeAPShop = ItemDatabase.instance.items.Where(x => x.itemName == "ArchipelagoShopItem").ToList();
@@ -916,12 +1023,20 @@ public partial class HasteAP
         var item_location = "";
         bool canSend = true;
         bool shouldParse = true;
+        bool refundable = false;
 
 
-        if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f && item.itemName != "ArchipelagoShopItem")
+        if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f)
         {
-            shouldParse = false;
-            canSend = false;
+            if (item.itemName == "ArchipelagoShopItem")
+            {
+                refundable = true;
+            }
+            else
+            {
+                shouldParse = false;
+                canSend = false;
+            }
         }
 
         if (shouldParse)
@@ -939,13 +1054,30 @@ public partial class HasteAP
                     item_location = $"Shard {currentShard} Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
                 }
                 FactSystem.AddToFact(new Fact("APShopsanityShard" + currentShard), 1f);
-                canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                canSend = FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard)) <= GetShopQuantity(currentShard);
             }
             else if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
             {
                 item_location = "Global Shop Item " + Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityGlobal")) + 1).ToString("D3");
-                FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
-                canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                if (FactSystem.GetFact(new Fact("APShopsanityBlockers")) == 1f)
+                {
+                    // only increment if its valid to do so
+                    if (Math.Floor(FactSystem.GetFact(new Fact("APShopsanityGlobal")) / 15) <= FactSystem.GetFact(new Fact("APShopsanityBlockersFound")))
+                    {
+                        FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
+                        canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                    }
+                    else
+                    {
+                        PrintBothDebug($"You do not have enough 'Progressive Global Shop Pack' items to send this purchase's check.", isDebug:false);
+                        canSend = false;
+                    }
+                }
+                else
+                {
+                    FactSystem.AddToFact(new Fact("APShopsanityGlobal"), 1f);
+                    canSend = FactSystem.GetFact(new Fact("APShopsanityGlobal")) <= FactSystem.GetFact(new Fact("APShopsanityQuantity"));
+                }
             }
             else if (FactSystem.GetFact(new Fact("APShopsanity")) == 0f)
             {
@@ -957,6 +1089,13 @@ public partial class HasteAP
         {
             PrintBothDebug("Bought Item at " + item_location);
             connection.SendLocation(item_location);
+        }
+        else
+        {
+            if (refundable && FactSystem.GetFact(new Fact("APRefundBadPurchases")) == 1f)
+            {
+                price = 0;
+            }
         }
 
         // manually calculating the index of the item selected so it doesnt buy a different item with the same name later in the buying process
@@ -991,7 +1130,7 @@ public partial class HasteAP
 
 
     /// <summary>
-    /// Hook into when a Boss is deafeted. Used to give boss locations
+    /// Hook into when a Boss is defeated. Used to give boss locations or release the world
     /// </summary>
     private static void StaticBossDeathHook(On.GM_API.orig_OnBossDeath orig)
     {
@@ -1009,7 +1148,7 @@ public partial class HasteAP
         if (currentDisaster > 0) boss_location = $"Disaster Shard {currentDisaster} Boss";
         PrintBothDebug($"Boss Defeated at {boss_location}");
 
-        if (currentShard == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal")))){
+        if (currentShard + currentDisaster == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal")))){
             ApDebugLog.Instance.DisplayMessage("Game Complete");
             connection.CompleteGame();
         } else
@@ -1020,7 +1159,7 @@ public partial class HasteAP
     }
 
     /// <summary>
-    /// Hook into when the end Boss is deafeted. Used release the world
+    /// Hook into when the end Boss is defeated. Used to give boss locations or release the world
     /// </summary>
     private static void StaticEndBossHook(On.GM_API.orig_OnEndBossWin orig)
     {
@@ -1029,14 +1168,22 @@ public partial class HasteAP
             ApDebugLog.Instance.DisplayMessage("AP On End Boss Win the connection is null");
             return;
         }
+        
+        // apparently, final machine can appear in disaster shards. coulda sworn they recycled jumper/convoy/snake 3 again
+        var currentShard = RunHandler.RunData.shardID + 1;
+        var currentDisaster = RunHandler.RunData.runConfig.ascensionLevel;
+        
         if (Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal"))) == 10)
         {
             ApDebugLog.Instance.DisplayMessage("Game Complete");
             connection.CompleteGame();
         } else
         {
-            connection.SendLocation("Shard 10 Boss");
+            var boss_location = $"Shard {currentShard} Boss";
+            if (currentDisaster > 0) boss_location = $"Disaster Shard {currentDisaster} Boss";
+            connection.SendLocation(boss_location);
         }
+        FactSystem.SetFact(new Fact("APBossDefeated"), Math.Max(FactSystem.GetFact(new Fact("APBossDefeated")), currentShard+currentDisaster));
         orig();
     }
 
@@ -1204,7 +1351,8 @@ public partial class HasteAP
     private static void StaticHubWorldUnlockHook(On.Landfall.Haste.SkinManager.orig_HubWorldUnlockSkins orig)
     {
         SkinManager.CompleteRunUnlockSkins((int)FactSystem.GetFact(new Fact("current_unbeaten_shard")) - 1);
-        if (FactSystem.GetFact(new Fact("Has_Won_Game")) > 0f)
+        //TODO: make sure this change doesnt break everything
+        if (FactSystem.GetFact(new Fact("current_unbeaten_shard")) >= 10f)
         {
             SkinManager.UnlockSkin(SkinManager.Skin.Crispy, false);
         }
@@ -1258,6 +1406,15 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APFashionPurchases")) >= 1f)
         {
             connection.SendLocation($"Costume Purchase: {GetFashionPurchaseName(self.skin.Skin)}");
+            // MIGHT need this? maybe its fine since i'm not using the unpurchaser anymore
+            // if (self.skin.Skin == SkinManager.Skin.Blue)
+            // {
+            //     FactSystem.SetFact(new Fact("APBlueStatus"), 2f);
+            // }
+            // if (self.skin.Skin == SkinManager.Skin.Green)
+            // {
+            //     FactSystem.SetFact(new Fact("APGreenStatus"), 2f);
+            // }
         }
         orig(self);
     }
@@ -1469,6 +1626,9 @@ public partial class HasteAP
         if (connection.GetItemCount("Persistent Epic Support Item") is var peu and > 0) FactSystem.SetFact(new Fact("APEpicSupportItems"), peu);
         if (connection.GetItemCount("Persistent Epic Health Item") is var peh and > 0) FactSystem.SetFact(new Fact("APEpicHealthItems"), peh);
         if (connection.GetItemCount("Persistent Legendary Item") is var pl and > 0) FactSystem.SetFact(new Fact("APLegendaryItems"), pl);
+        
+        // misc
+        if (connection.GetItemCount("Progressive Global Shop Pack") is var pgsp and > 0) FactSystem.SetFact(new Fact("APShopsanityBlockersFound"), pgsp);
         
         Player.localPlayer.ResetStats();
         SaveSystem.Save();
@@ -1713,12 +1873,11 @@ public class ApHubScoutSetting : EnumSetting<HubScoutMode>, IExposedSetting
         UnityMainThreadDispatcher.Instance().log($"AP Changed Hub Scout to {Value}");
     }
 
-    //TODO: switch this to Yaml once the new version releases
-    protected override HubScoutMode GetDefaultValue() => HubScoutMode.Enabled;
+    protected override HubScoutMode GetDefaultValue() => HubScoutMode.YAML;
     public override List<LocalizedString> GetLocalizedChoices() => [
         new UnlocalizedString("Enabled"), 
         new UnlocalizedString("Disabled"), 
-        // new UnlocalizedString("Inherit from Yaml"),
+        new UnlocalizedString("Inherit from YAML"),
     ];
     public LocalizedString GetDisplayName() => new UnlocalizedString("Scout Hub Purchase locations");
     public string GetCategory() => "AP";
@@ -1764,8 +1923,8 @@ public enum DeathLinkMode
     OnShardFail, OnDeath
 }
 
-//TODO: add the yaml option when v0.5 comes out
+
 public enum HubScoutMode
 {
-    Enabled, Disabled
+    Enabled, Disabled, YAML
 }

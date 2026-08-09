@@ -28,6 +28,12 @@ namespace Integration
                 UnityMainThreadDispatcher.Instance().log("AP ShardUnlock is set to bosses, new count: " + _shardCount);
             } 
             UnityMainThreadDispatcher.Instance().log("AP unlocked to shard: " + _shardCount);
+            if (_shardCount > 9)
+            {
+                // should deal with ascension levels here
+                UnityMainThreadDispatcher.Instance().log("AP shards exceed, new ascension count: " + (_shardCount-9));
+                FactSystem.SetFact(new Fact("Current_UnlockedAscensionLevel"), _shardCount-9);
+            }
             // Change the connection data first as this value is checked on factsystem update
             PlayerProgress.UnlockToShard(_shardCount);
             SaveSystem.Save();
@@ -240,6 +246,12 @@ namespace Integration
                         worthMentioning = true;
                         quantity = connection!.GetItemCount("Persistent Legendary Item");
                         ForcePermItem(Rarity.Legendary, APItemCategory.Legendary);
+                        break;
+                    case "Progressive Global Shop Pack":
+                        HasteAP.PrintBothDebug("Got Progressive Global Shop Pack");
+                        FactSystem.AddToFact(new Fact("APShopsanityBlockersFound"), 1f);
+                        worthMentioning = true;
+                        quantity = connection!.GetItemCount("Progressive Global Shop Pack");
                         break;
                     case "Anti-Spark 10 bundle":
                         HasteAP.PrintBothDebug("Got Anti-Spark 10 bundle");

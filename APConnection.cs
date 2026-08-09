@@ -173,6 +173,19 @@ public class Connection(string hostname, int port)
                 {
                     UnityMainThreadDispatcher.Instance().log($"AP found ShopsanityQuantity in slot data with value: {PSShopsanityQuantity}");
                     FactSystem.SetFact(new Fact("APShopsanityQuantity"), Convert.ToSingle(PSShopsanityQuantity));
+                    
+                    if (loginSuccess.SlotData.TryGetValue("Per-Shard Shopsanity Scaling", out object FS))
+                    {
+                        FactSystem.SetFact(new Fact("APShopsanityPerShardScaling"), Convert.ToSingle(FS));
+                        loginSuccess.SlotData.TryGetValue("Per-Shard Shopsanity Dynamic Quantity", out object FDQ);
+                        FactSystem.SetFact(new Fact("APShopsanityDynamicQuantity"), Convert.ToSingle(FDQ));
+                    }
+                    else
+                    {
+                        UnityMainThreadDispatcher.Instance().logError("AP Failed to get Shopsanity Scaling from slot data:" + loginSuccess.SlotData.toJson());
+                        FactSystem.SetFact(new Fact("APShopsanityPerShardScaling"), 1f);
+                        FactSystem.SetFact(new Fact("APShopsanityDynamicQuantity"), 80f);
+                    }
                 }
                 else
                 {
@@ -199,11 +212,18 @@ public class Connection(string hostname, int port)
             // Might default the value here to make things consistant
         }
 
-        if (loginSuccess.SlotData.TryGetValue("Shopsanity Seperate", out object ShopsanitySeperate))
+        // very stupid workaround for an old setting having a fixed name (typo)
+        object? ShopsanitySeperate = null;
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity Separate", out object ss1)) ShopsanitySeperate = ss1;
+        if (loginSuccess.SlotData.TryGetValue("Shopsanity Seperate", out object ss2)) ShopsanitySeperate = ss2;
+        if (ShopsanitySeperate != null)
         {
             UnityMainThreadDispatcher.Instance().log($"AP found ShopsanitySeperate in slot data with value: {ShopsanitySeperate}");
             FactSystem.SetFact(new Fact("APShopsanitySeperate"), Convert.ToSingle(ShopsanitySeperate));
-            if (loginSuccess.SlotData.TryGetValue("Shopsanity Seperate Rate", out object ShopsanitySeperateRate))
+            object? ShopsanitySeperateRate = null;
+            if (loginSuccess.SlotData.TryGetValue("Shopsanity Separate Rate", out object ssr1)) ShopsanitySeperateRate = ssr1;
+            if (loginSuccess.SlotData.TryGetValue("Shopsanity Seperate Rate", out object ssr2)) ShopsanitySeperateRate = ssr2;
+            if (ShopsanitySeperateRate != null)
             {
                 UnityMainThreadDispatcher.Instance().log($"AP found ShopsanitySeperate in slot data with value: {ShopsanitySeperateRate}");
                 FactSystem.SetFact(new Fact("APShopsanitySeperateRate"), Convert.ToSingle(ShopsanitySeperateRate));
@@ -218,6 +238,17 @@ public class Connection(string hostname, int port)
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShopsanitySeperate from slot data:" + loginSuccess.SlotData.toJson());
             FactSystem.SetFact(new Fact("APShopsanitySeperate"), 0f);
+        }
+        
+        if (loginSuccess.SlotData.TryGetValue("Global Shopsanity Blockers", out object GSB))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found Global Shopsanity Blockers in slot data with value: {GSB}");
+            FactSystem.SetFact(new Fact("APShopsanityBlockers"), Convert.ToSingle(GSB));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get Global Shopsanity Blockers from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APShopsanityBlockers"), 0f);
         }
 
 
@@ -263,6 +294,17 @@ public class Connection(string hostname, int port)
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get ShardGoal from slot data:" + loginSuccess.SlotData.toJson());
             FactSystem.SetFact(new Fact("APShardGoal"), 10f);
         }
+        
+        if (loginSuccess.SlotData.TryGetValue("Starting Shard", out object StartingShard))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found StartingShard in slot data with value: {StartingShard}");
+            FactSystem.SetFact(new Fact("APStartingShard"), Convert.ToSingle(StartingShard));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get StartingShard from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APStartingShard"), 1f);
+        }
 
 
         if (loginSuccess.SlotData.TryGetValue("Fragmentsanity", out object Fragmentsanity))
@@ -274,6 +316,19 @@ public class Connection(string hostname, int port)
             {
                 loginSuccess.SlotData.TryGetValue("Per-Shard Fragmentsanity Quantity", out object FQ);
                 FactSystem.SetFact(new Fact("APFragmentsanityQuantity"), Convert.ToSingle(FQ));
+
+                if (loginSuccess.SlotData.TryGetValue("Per-Shard Fragmentsanity Scaling", out object FS))
+                {
+                    FactSystem.SetFact(new Fact("APFragmentsanityPerShardScaling"), Convert.ToSingle(FS));
+                    loginSuccess.SlotData.TryGetValue("Per-Shard Fragmentsanity Dynamic Quantity", out object FDQ);
+                    FactSystem.SetFact(new Fact("APFragmentsanityDynamicQuantity"), Convert.ToSingle(FDQ));
+                }
+                else
+                {
+                    UnityMainThreadDispatcher.Instance().logError("AP Failed to get Fragmentsanity Scaling from slot data:" + loginSuccess.SlotData.toJson());
+                    FactSystem.SetFact(new Fact("APFragmentsanityPerShardScaling"), 1f);
+                    FactSystem.SetFact(new Fact("APFragmentsanityDynamicQuantity"), 80f);
+                }
 
             } else if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f)
             {
@@ -340,11 +395,14 @@ public class Connection(string hostname, int port)
             {
                 if (Convert.ToSingle(FashionPurchases) == 2f)
                 {
-                    // Unlocks Cripsy and Twisted and locks Green and Blue
-                    SkinManager.UnlockSkin(SkinManager.Skin.Crispy);
-                    SkinManager.UnlockSkin(SkinManager.Skin.DarkClown);
-                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Green);
-                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Blue);
+                    // Unlocks Cripsy and Twisted for old versions and locks Green and Blue
+                    if (FactSystem.GetFact(new Fact("APVersionMiddle")) == 4f)
+                    {
+                        SkinManager.UnlockSkin(SkinManager.Skin.Crispy);
+                        SkinManager.UnlockSkin(SkinManager.Skin.DarkClown);
+                    }
+                    SkinManager.LockSkin(SkinManager.Skin.Green);
+                    SkinManager.LockSkin(SkinManager.Skin.Blue);
                     SkinManager.UnlockSkin(SkinManager.Skin.Green);
                     SkinManager.UnlockSkin(SkinManager.Skin.Blue);
                     // manually unlocks Zoe64 and Shadow since the default unlocker is bypassed
@@ -356,8 +414,8 @@ public class Connection(string hostname, int port)
                     // Unlocks all
                     SkinManager.UnlockAllSkins();
                     // weird guys
-                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Green);
-                    SkinManager.UnpurchaseSkin(SkinManager.Skin.Blue);
+                    SkinManager.LockSkin(SkinManager.Skin.Green);
+                    SkinManager.LockSkin(SkinManager.Skin.Blue);
                     SkinManager.UnlockSkin(SkinManager.Skin.Green);
                     SkinManager.UnlockSkin(SkinManager.Skin.Blue);
                 }
@@ -418,16 +476,16 @@ public class Connection(string hostname, int port)
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get PermItems from slot data:" + loginSuccess.SlotData.toJson());
         }
 
-        if (loginSuccess.SlotData.TryGetValue("S-Rank Bonus", out object SRankBonus))
-        {
-
-            UnityMainThreadDispatcher.Instance().log($"AP found SRankBonus in slot data with value: {SRankBonus}");
-            FactSystem.SetFact(new Fact("APSRankBonus"), Convert.ToSingle(SRankBonus));
-        }
-        else
-        {
-            UnityMainThreadDispatcher.Instance().logError("AP Failed to get SRankBonus from slot data:" + loginSuccess.SlotData.toJson());
-        }
+        // if (loginSuccess.SlotData.TryGetValue("S-Rank Bonus", out object SRankBonus))
+        // {
+        //
+        //     UnityMainThreadDispatcher.Instance().log($"AP found SRankBonus in slot data with value: {SRankBonus}");
+        //     FactSystem.SetFact(new Fact("APSRankBonus"), Convert.ToSingle(SRankBonus));
+        // }
+        // else
+        // {
+        //     UnityMainThreadDispatcher.Instance().logError("AP Failed to get SRankBonus from slot data:" + loginSuccess.SlotData.toJson());
+        // }
 
         if (loginSuccess.SlotData.TryGetValue("Default Outfit Body", out object DefSkinBody))
         {
@@ -479,6 +537,47 @@ public class Connection(string hostname, int port)
         else
         {
             UnityMainThreadDispatcher.Instance().logError("AP Failed to get UnlockAllItems from slot data:" + loginSuccess.SlotData.toJson());
+        }
+        
+        if (loginSuccess.SlotData.TryGetValue("Refund Unnecessary Purchases", out object RUP))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found RefundUnnecessaryPurchases in slot data with value: {RUP}");
+            FactSystem.SetFact(new Fact("APRefundBadPurchases"), Convert.ToSingle(RUP));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get RefundUnnecessaryPurchases from slot data:" + loginSuccess.SlotData.toJson());
+        }
+        
+        if (loginSuccess.SlotData.TryGetValue("Remove Shop Items When Done", out object RSIWD))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found RemoveShopItemsWhenDone in slot data with value: {RSIWD}");
+            FactSystem.SetFact(new Fact("APRemoveShopItemsWhenDone"), Convert.ToSingle(RSIWD));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get RemoveShopItemsWhenDone from slot data:" + loginSuccess.SlotData.toJson());
+        }
+        
+        if (loginSuccess.SlotData.TryGetValue("Scout Locations", out object SHL))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found ScoutHubLocations in slot data with value: {SHL}");
+            FactSystem.SetFact(new Fact("APScoutHubLocations"), Convert.ToSingle(SHL));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get ScoutHubLocations from slot data:" + loginSuccess.SlotData.toJson());
+            FactSystem.SetFact(new Fact("APScoutHubLocations"), 1f);
+        }
+        
+        if (loginSuccess.SlotData.TryGetValue("Global Disaster Level", out object BDL))
+        {
+            UnityMainThreadDispatcher.Instance().log($"AP found BaseDisasterLevel in slot data with value: {BDL}");
+            FactSystem.SetFact(new Fact("APBaseDisasterLevel"), Convert.ToSingle(BDL));
+        }
+        else
+        {
+            UnityMainThreadDispatcher.Instance().logError("AP Failed to get BaseDisasterLevel from slot data:" + loginSuccess.SlotData.toJson());
         }
 
 
@@ -794,10 +893,8 @@ public class Connection(string hostname, int port)
         var setting = GameHandler.Instance.SettingsHandler.GetSetting<ApHubScoutSetting>().Value;
         switch (setting)
         {
-            // case HubScoutMode.Yaml:
-            //     //TODO: get the info from slotdata or something
-            //     return false;
-            //     break;
+            case HubScoutMode.YAML:
+                return FactSystem.GetFact(new Fact("APScoutHubLocations")) == 1f;
             case HubScoutMode.Disabled:
                 return false;
             case HubScoutMode.Enabled:
