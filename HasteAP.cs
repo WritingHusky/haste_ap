@@ -584,6 +584,8 @@ public partial class HasteAP
             {
                 locationName = "Global Fragment Clear ";
                 FragKeyword = "Global";
+                // set this to stupid high so it always clears
+                currentShard = 99;
             }
 
             float quan = GetFragmentQuantity(currentShard);
