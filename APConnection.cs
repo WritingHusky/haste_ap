@@ -103,6 +103,11 @@ public class Connection(string hostname, int port)
             {
                 // mod is newer than AP
                 ApDebugLog.Instance.DisplayMessage($"<color=#FFFF00>WARNING:</color> Mod version ({modVersion}) is newer than APworld version ({apVersion}).\nYou may experience some glitches due to this version mismatch.\nPlease update your APworld if possible to ensure the smoothest experience.", isDebug:false);
+            } else if (modVersion.CompareTo(apVersion) < 0)
+            {
+                // AP is newer than mod???
+                ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> APworld version ({apVersion}) is newer than mod version ({modVersion}).\nPlease unsubscribe and resubscribe to this mod to force the update to be downloaded.", isDebug:false);
+                return false;
             }
 
             if (FactSystem.GetFact(new Fact("APVersionMajor")) != 0 ||

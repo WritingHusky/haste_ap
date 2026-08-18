@@ -768,7 +768,7 @@ public partial class HasteAP
 
         if (ItemDatabase.instance == null)
         {
-            PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item due to ItemDatabase.instance being null. This item will be re-generated later in the run. Skipping.\nIf you see this error multiple times, you should probably alert the developer of this mod and include your log files.", duration: 10f, isDebug: false, isError:true);
+            PrintBothDebug($"Could not generate {rarity} {category} item due to ItemDatabase.instance being null. This item will be re-generated later in the run. Skipping.\nIf you see this error multiple times, you should probably alert the developer of this mod and include your log files.", duration: 10f, isDebug: false, isError:true);
             return;
         }
 
@@ -789,7 +789,7 @@ public partial class HasteAP
 
             if (itemlist.Count == 0)
             {
-                PrintBothDebug($"Could not generate {rarity} {((category != APItemCategory.Legendary) ? category : string.Empty)} item due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
+                PrintBothDebug($"Could not generate {rarity} {category} item due to there being no available items in that pool unlocked. Skipping.", duration: 10f, isDebug: false, isError:true);
                 return;
             }
 
@@ -863,7 +863,7 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APFragmentsanityPerShardScaling")) == 2f && FactSystem.GetFact(new Fact("APFragmentsanity")) == 1f)
         {
             // lookup shard length from table, multiply it by dynamic quan
-            float ratio = FactSystem.GetFact(new Fact("APFragmentsanityDynamicQuantity")) / 100;
+            double ratio = FactSystem.GetFact(new Fact("APFragmentsanityDynamicQuantity")) / 100;
             return (int)Math.Floor(LookupTables.LookupTable.ShardLengths[shard-1] * ratio);
         }
 
@@ -877,7 +877,7 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APShopsanityPerShardScaling")) == 2f && FactSystem.GetFact(new Fact("APShopsanity")) == 1f)
         {
             // lookup shard length from table, multiply it by dynamic quan
-            float ratio = FactSystem.GetFact(new Fact("APShopsanityDynamicQuantity")) / 100;
+            double ratio = FactSystem.GetFact(new Fact("APShopsanityDynamicQuantity")) / 100;
             return (int)Math.Floor(Math.Floor((double)(LookupTables.LookupTable.ShardLengths[shard-1] / 2)) * ratio);
         }
 
@@ -1565,6 +1565,16 @@ public partial class HasteAP
     public static void JacobAsked()
     {
         string thedump = FactSystem.GetSerializedFacts().Aggregate("", (current, fact) => current + $"{fact.Key} :: {fact.Value}\n");
+        // go through the whole process again to also get the build hash
+        var ass = typeof(HasteAP).Assembly;
+        using (Stream stream = ass.GetManifestResourceStream("Program.Resources.BuildDate.txt"))
+        using (StreamReader reader = new StreamReader(stream))
+        {
+            string result = reader.ReadToEnd();
+            var Build = result.GetHashCode().ToString("X");
+            
+            thedump += $"\nMod Version {version} ({Build})";
+        }
         // dumps into haste directory on steam
         File.WriteAllText($"JacobAskedOn_{DateTime.Now:MM-dd-yyyy_hh-mm-ss}.txt", thedump, new UTF8Encoding());
         UnityMainThreadDispatcher.Instance().log($"Savedata information has been saved to your Haste directory. Go send that file to Jacob, who asked for this.\nTo find this directory go to Haste in your Steam Library, Right Click -> Manage -> Browse Local Files");
