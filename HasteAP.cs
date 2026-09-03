@@ -19,7 +19,7 @@ public partial class HasteAP
 {
     private static Connection? connection;
 
-    private static readonly Version version = new(0, 5, 0);
+    private static readonly Version version = new(0, 5, 1);
 
     static HasteAP()
     {
@@ -190,7 +190,7 @@ public partial class HasteAP
         {
             PrintBothDebug("Deathlink is Enabled");
 
-            connection.deathLinkService!.OnDeathLinkReceived += GiveDeath;
+            connection.deathLinkService!.OnDeathLinkReceived += connection.DeathReceiver;
 
             connection.deathLinkService!.EnableDeathLink();
 
@@ -302,7 +302,7 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f)
         {
             On.Player.Die -= StaticSendDeathOnDie;
-            connection.deathLinkService!.OnDeathLinkReceived -= GiveDeath;
+            connection.deathLinkService!.OnDeathLinkReceived -= connection.DeathReceiver;
             connection.deathLinkService!.DisableDeathLink();
 
         }
@@ -485,6 +485,9 @@ public partial class HasteAP
     {
         PrintBothDebug("Loading into Hub");
         FactSystem.SetFact(new Fact("APSafelyInHub"), 1f);
+        // if loading into the hub, then its probably safe to clear the doublestopper
+        FactSystem.SetFact(new Fact("APDoubleKillStopper"), 0f);
+        
 
         UpdateShardCount();
         SetHubState();
@@ -916,7 +919,7 @@ public partial class HasteAP
 
     private static void StaticGenerateItemHook(On.ShopItemHandler.orig_GenerateItems orig, ShopItemHandler self)
     {
-        if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f)
+        if (FactSystem.GetFact(new Fact("APShopsanitySeperate")) == 1f && FactSystem.GetFact(new Fact("APShopsanity")) > 0f)
         {
             ApDebugLog.Instance.DisplayMessage($"Static Generate Item Hook");
             try
@@ -1049,7 +1052,7 @@ public partial class HasteAP
                 var currentShard = RunHandler.RunData.shardID + 1 + currentDisaster;
                 if (currentDisaster > 0)
                 {
-                    item_location = $"Disaster Shard {currentDisaster} + Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
+                    item_location = $"Disaster Shard {currentDisaster} Shop Item " + (Convert.ToInt32(FactSystem.GetFact(new Fact("APShopsanityShard" + currentShard))) + 1).ToString("D2");
                 }
                 else
                 {
@@ -1538,7 +1541,7 @@ public partial class HasteAP
             FactSystem.SetFact(new Fact($"APFragmentsanityLocationGlobal"), 0f);
         } else
         {
-            if (shard is < 0 or > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
+            if (shard is < 0 or > 14) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 14"); return; }
             // only reset limit for non-linear dist
             if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitShard{shard}"), 1f); }
             FactSystem.SetFact(new Fact($"APFragmentsanityShard{shard}"), 0f);
@@ -1556,7 +1559,7 @@ public partial class HasteAP
         }
         else
         {
-            if (shard is < 0 or > 10) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 10"); return; }
+            if (shard is < 0 or > 14) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 14"); return; }
             FactSystem.SetFact(new Fact($"APShopsanityShard{shard}"), 0f);
         }
     }

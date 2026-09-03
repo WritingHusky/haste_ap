@@ -58,7 +58,7 @@
     </ItemGroup>
 
     <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-      <Exec Command="echo %24(date +%25F) &gt; &quot;$(ProjectDir)Resources/BuildDate.txt&quot;" />
+      <Exec Command="echo %24(date +%25F_%25H) &gt; &quot;$(ProjectDir)Resources/BuildDate.txt&quot;" />
     </Target>
 
 </Project>

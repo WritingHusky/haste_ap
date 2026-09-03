@@ -31,6 +31,7 @@ public class Connection(string hostname, int port)
 
     private static Timer backgroundTimer;
     private Queue<Action> actions = new ();
+    private Queue<DeathLink> deaths = new();
     public bool WillNeedToForceReload = false;
     public bool HasDisconnected = false;
     public bool AttemptingReconnect = false;
@@ -720,26 +721,24 @@ public class Connection(string hostname, int port)
         try
         {
 
-            UnityMainThreadDispatcher.Instance().log("AP Item recieved trigger");
+            UnityMainThreadDispatcher.Instance().log("AP Item received trigger");
             //ApDebugLog.Instance.DisplayMessage("Item Recieved");
         }
         catch (Exception e)
         {
-            UnityMainThreadDispatcher.Instance().logError($"Error in printing message {e.Message},{e.StackTrace}");
-            ApDebugLog.Instance.DisplayMessage($"<color=#FF0000>ERROR:</color> Error in printing message {e.Message},{e.StackTrace}", duration: 10f, false);
+            HasteAP.PrintBothDebug($"Error in printing message {e.Message},{e.StackTrace}", isError:true, isDebug:false);
         }
         
         if (IsItSafe())
         {
             int copy = rih.Index;
-            UnityMainThreadDispatcher.Instance().log($"Item received of index {copy} and safe to go.");
+            HasteAP.PrintBothDebug($"Item received of index {copy} and safe to go.");
             ProcessItem(rih, copy, false);
         } else
         {
             // lambda-capture lookin-ass workaround i swear to god
             int copy = rih.Index;
-            UnityMainThreadDispatcher.Instance().log($"Enqueuing Item of index {copy} to Actions Queue because its not safe.");
-            ApDebugLog.Instance.DisplayMessage($"Enqueuing Item of index {copy} to Actions Queue because its not safe.");
+            HasteAP.PrintBothDebug($"Enqueuing Item of index {copy} to Actions Queue because its not safe.");
             actions.Enqueue(() => ProcessItem(rih, copy, true));
         }
     }
@@ -771,6 +770,48 @@ public class Connection(string hostname, int port)
                 HasteAP.PrintBothDebug($"Error in giving item {e.Message},{e.StackTrace}", duration: 10f, isError: true);
             }
         }
+    }
+
+    public void DeathReceiver(DeathLink death)
+    {
+        HasteAP.PrintBothDebug("Death Received");
+        if (IsItSafe())
+        {
+            HasteAP.PrintBothDebug($"Processing Death Immediately");
+            ProcessDeath(death);
+        }
+        else
+        {
+            HasteAP.PrintBothDebug($"Enqueuing Death because it is not safe");
+            deaths.Enqueue(death);
+        }
+    }
+
+    private void ProcessDeath(DeathLink death)
+    {
+        var cause = "";
+        if (!string.IsNullOrEmpty(death.Cause))
+        {
+            cause = $" from {death.Cause}";
+        }
+        HasteAP.PrintBothDebug($"Death Received{cause}.", isDebug:false);
+            
+        if (FactSystem.GetFact(new Fact("APDeathSendMode"))==FactSystem.GetFact(new Fact("APDeathReceiveMode"))) {
+            // Only enable the doublekill stopper if receiving this death would send a new one.
+            FactSystem.SetFact(new Fact("APDoubleKillStopper"), 1f);
+        }
+            
+        if (FactSystem.GetFact(new Fact("APDeathReceiveMode")) == (float)DeathLinkMode.OnDeath)
+        {
+            GM_Run.instance.FallOut(PlayerCharacter.localPlayer);
+        }
+        else
+        {
+            // essentially the same thing as forcibly losing the run immediately
+            Player.localPlayer.EditLives(-999);
+            GM_Run.instance.FallOut(PlayerCharacter.localPlayer);
+        }
+
     }
 
     public void SendTaglinkPacket(int currentAbility)
@@ -828,7 +869,7 @@ public class Connection(string hostname, int port)
         deathLinkService = session.CreateDeathLinkService();
         if (FactSystem.GetFact(new Fact("APDeathlink")) == 1f){
 
-            deathLinkService!.OnDeathLinkReceived += Integration.Integration.GiveDeath;
+            deathLinkService!.OnDeathLinkReceived += DeathReceiver;
             deathLinkService!.EnableDeathLink();
         }
 
@@ -978,6 +1019,14 @@ public class Connection(string hostname, int port)
 
             }
             if (WillNeedToForceReload) Integration.Integration.ForceReload();
+            if (deaths.Count > 0 && IsItSafe())
+            {
+                while (deaths.Count > 0)
+                {
+                    var de = deaths.Dequeue();
+                    ProcessDeath(de);
+                }
+            }
             
             if (!HasDisconnected && LocationsToBeSent.Count != 0)
             {
