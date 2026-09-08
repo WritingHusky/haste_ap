@@ -450,16 +450,17 @@ public class Connection(string hostname, int port)
             {
                 case 1f:
                     // the new unlock function (that handles board) isnt set by this point so i gotta set the fact manually here lmao
+                    // the new function also silences the Wobbler skin notification, so if an ability is unlocked here and the conditions are met, it fires a broken notification and shatters everything
                     FactSystem.SetFact(new Fact("APBoostUnlocked"), 1f);
                     break;
                 case 2f:
-                    MetaProgression.Unlock(AbilityKind.Slomo);
+                    FactSystem.SetFact(new Fact("ability_slomo_unlocked"), 1F);
                     break;
                 case 3f:
-                    MetaProgression.Unlock(AbilityKind.Grapple);
+                    FactSystem.SetFact(new Fact("ability_grapple_unlocked"), 1F);
                     break;
                 case 4f:
-                    MetaProgression.Unlock(AbilityKind.Fly);
+                    FactSystem.SetFact(new Fact("ability_fly_unlocked"), 1F);
                     break;
 
             }

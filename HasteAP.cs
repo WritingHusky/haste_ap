@@ -91,11 +91,25 @@ public partial class HasteAP
         }
 
         UnityMainThreadDispatcher.Instance().log("AP enabled so beginning startup");
-        var serverName = settingsHandler.GetSetting<ApServerNameSetting>().Value;
+        var serverName = settingsHandler.GetSetting<ApServerNameSetting>().Value.Trim();
         var serverPort = settingsHandler.GetSetting<ApServerPortSetting>().Value;
-        var username = settingsHandler.GetSetting<ApUsernameSetting>().Value;
-        var password = settingsHandler.GetSetting<ApPasswordSetting>().Value;
+        var username = settingsHandler.GetSetting<ApUsernameSetting>().Value.Trim();
+        var password = settingsHandler.GetSetting<ApPasswordSetting>().Value.Trim();
 
+        // attempt to manually fix the common case of people putting the port number in here
+        var parts = serverName.Split(':');
+        if (parts.Length > 1)
+        {
+            // if its SUPER wrong, then raise an error to stop them to set it up properly
+            if (int.Parse(parts[-1]) != serverPort)
+            {
+                PrintBothDebug($"Detected anomaly in server name ({serverName}) and port ({serverPort}).\nPlease make sure the server name does NOT include the colon and port number (archipelago.gg is correct, but archipelago.gg:38281 is WRONG)", isError:true);
+                return;
+            }
+            // if the ports match, set the servername to whats before the colon
+            serverName = parts[0];
+        }
+        
         if (password == "")
         {
             password = null;
@@ -104,7 +118,16 @@ public partial class HasteAP
         FactSystem.SetFact(new Fact("APSafelyInHub"), 0f);
         FactSystem.SetFact(new Fact("in_run"), 0f);
 
-        connection = new Connection(serverName, serverPort);
+        try
+        {
+            connection = new Connection(serverName, serverPort);
+        }
+        catch (Exception e)
+        {
+            PrintBothDebug($"Error in connection creation: {e.Message},{e.InnerException},{e.StackTrace}", isError:true);
+            PrintBothDebug($"Usually, this means that there is a mistake in your server name ({serverName}) or port ({serverPort}).", isDebug:false);
+            return;
+        }
 
         // This must go BEFORE connection
         connection.SetupHandlers();
