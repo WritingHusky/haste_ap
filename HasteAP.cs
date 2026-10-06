@@ -96,18 +96,26 @@ public partial class HasteAP
         var username = settingsHandler.GetSetting<ApUsernameSetting>().Value.Trim();
         var password = settingsHandler.GetSetting<ApPasswordSetting>().Value.Trim();
 
-        // attempt to manually fix the common case of people putting the port number in here
-        var parts = serverName.Split(':');
-        if (parts.Length > 1)
+        try
         {
-            // if its SUPER wrong, then raise an error to stop them to set it up properly
-            if (int.Parse(parts[-1]) != serverPort)
+            // attempt to manually fix the common case of people putting the port number in here
+            var parts = serverName.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 1)
             {
-                PrintBothDebug($"Detected anomaly in server name ({serverName}) and port ({serverPort}).\nPlease make sure the server name does NOT include the colon and port number (archipelago.gg is correct, but archipelago.gg:38281 is WRONG)", isError:true);
-                return;
+                // if its SUPER wrong, then raise an error to stop them to set it up properly
+                if (int.Parse(parts.Last()) != serverPort)
+                {
+                    PrintBothDebug($"Detected anomaly in server name ({serverName}) and port ({serverPort}).\nPlease make sure the server name does NOT include the colon and port number (archipelago.gg is correct, but archipelago.gg:38281 is WRONG)", isError:true);
+                    return;
+                }
+                // if the ports match, set the servername to whats before the colon
+                serverName = parts.First();
             }
-            // if the ports match, set the servername to whats before the colon
-            serverName = parts[0];
+        }
+        catch (Exception e)
+        {
+            PrintBothDebug($"Error in hostname parsing: {e.Message},{e.InnerException},{e.StackTrace}", isError:true);
+            return;
         }
         
         if (password == "")
@@ -1176,7 +1184,8 @@ public partial class HasteAP
         if (currentDisaster > 0) boss_location = $"Disaster Shard {currentDisaster} Boss";
         PrintBothDebug($"Boss Defeated at {boss_location}");
 
-        if (currentShard + currentDisaster == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal")))){
+        if (currentShard + currentDisaster == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal"))))
+        {
             ApDebugLog.Instance.DisplayMessage("Game Complete");
             connection.CompleteGame();
         } else
@@ -1201,7 +1210,7 @@ public partial class HasteAP
         var currentShard = RunHandler.RunData.shardID + 1;
         var currentDisaster = RunHandler.RunData.runConfig.ascensionLevel;
         
-        if (Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal"))) == 10)
+        if (currentShard + currentDisaster == Convert.ToInt32(FactSystem.GetFact(new Fact("APShardGoal"))))
         {
             ApDebugLog.Instance.DisplayMessage("Game Complete");
             connection.CompleteGame();
@@ -1559,16 +1568,27 @@ public partial class HasteAP
     {
         if (FactSystem.GetFact(new Fact("APFragmentsanity")) == 2f){
             //reset globals
-            if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitGlobal"), 1f); }
+            // if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitGlobal"), 1f); }
             FactSystem.SetFact(new Fact($"APFragmentsanityGlobal"), 0f);
-            FactSystem.SetFact(new Fact($"APFragmentsanityLocationGlobal"), 0f);
+            // FactSystem.SetFact(new Fact($"APFragmentsanityLocationGlobal"), 0f);
+            RecountLocation("Global Fragment Clear ", "APFragmentsanityLocationGlobal", GetFragmentQuantity(99));
+            SetFragmentLimits("Global");
         } else
         {
             if (shard is < 0 or > 14) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 14"); return; }
             // only reset limit for non-linear dist
-            if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitShard{shard}"), 1f); }
+            // if (FactSystem.GetFact(new Fact("APFragmentsanityDistribution")) != 1f) { FactSystem.SetFact(new Fact($"APFragmentLimitShard{shard}"), 1f); }
             FactSystem.SetFact(new Fact($"APFragmentsanityShard{shard}"), 0f);
-            FactSystem.SetFact(new Fact($"APFragmentsanityLocationShard{shard}"), 0f);
+            // FactSystem.SetFact(new Fact($"APFragmentsanityLocationShard{shard}"), 0f);
+            if (shard > 10)
+            {
+                RecountLocation($"Disaster Shard {shard - 10} Fragment Clear ", $"APFragmentsanityLocationShard{shard}", GetFragmentQuantity(shard));
+            }
+            else
+            {
+                RecountLocation($"Shard {shard} Fragment Clear ", $"APFragmentsanityLocationShard{shard}", GetFragmentQuantity(shard));
+            }
+            SetFragmentLimits($"Shard{shard}");
         }
     }
 
@@ -1578,13 +1598,44 @@ public partial class HasteAP
         if (FactSystem.GetFact(new Fact("APShopsanity")) == 2f)
         {
             //reset globals
-            FactSystem.SetFact(new Fact($"APShopsanityGlobal"), 0f);
+            // FactSystem.SetFact(new Fact($"APShopsanityGlobal"), 0f);
+            RecountLocation("Global Shop Item ", "APShopsanityGlobal", FactSystem.GetFact(new Fact("APShopsanityQuantity")), needsThirdDigit:true);
         }
         else
         {
             if (shard is < 0 or > 14) { UnityMainThreadDispatcher.Instance().logError($"Given value {shard} is not between 1 and 14"); return; }
-            FactSystem.SetFact(new Fact($"APShopsanityShard{shard}"), 0f);
+            // FactSystem.SetFact(new Fact($"APShopsanityShard{shard}"), 0f);
+            if (shard > 10)
+            {
+                RecountLocation($"Disaster Shard {shard - 10} Shop Item ", $"APShopsanityShard{shard}", GetShopQuantity(shard));
+            }
+            else
+            {
+                RecountLocation($"Shard {shard} Shop Item ", $"APShopsanityShard{shard}", GetShopQuantity(shard));
+            }
         }
+    }
+
+    private static void RecountLocation(string baseLocation, string baseFact, float limit, bool needsThirdDigit = false)
+    {
+        if (connection == null)
+        {
+            PrintBothDebug("On RecountLocation connection is null");
+            return;
+        };
+
+        // global shop specifically needs the third digit, but everything else caps before 100
+        string stringformat = needsThirdDigit ? "D3" : "D2";
+        
+        float startingFloat = FactSystem.GetFact(new Fact(baseFact));
+        for (int i = 0; i < limit; i++)
+        {
+            if (connection.IsLocationAlreadyChecked(baseLocation + (i + 1).ToString(stringformat))) continue;
+            FactSystem.SetFact(new Fact(baseFact), i);
+            break;
+        }
+        
+        PrintBothDebug($"Location {baseLocation}has been reset from {startingFloat} to {FactSystem.GetFact(new Fact(baseFact))}", isDebug:false);
     }
 
     [ConsoleCommand]

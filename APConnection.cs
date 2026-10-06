@@ -631,8 +631,15 @@ public class Connection(string hostname, int port)
             long locationID = session.Locations.GetLocationIdFromName(game, locationName);
             if (locationID != -1)
             {
-                HasteAP.PrintBothDebug($"Sending location {locationName}");
-                session.Locations.CompleteLocationChecks(locationID);
+                if (session.Locations.AllLocationsChecked.Contains(locationID))
+                {
+                    HasteAP.PrintBothDebug($"Location {locationName} has already been sent.", isDebug:false);
+                }
+                else
+                {
+                    HasteAP.PrintBothDebug($"Sending location {locationName}.");
+                    session.Locations.CompleteLocationChecks(locationID);
+                }
 
             }
             else
@@ -691,6 +698,27 @@ public class Connection(string hostname, int port)
         }
     }
 
+    public bool IsLocationAlreadyChecked(string locationName)
+    {
+        if (HasDisconnected)
+        {
+            HasteAP.PrintBothDebug($"Could not check the status of {locationName} due to connection problems. Please try again once the connection is restored.", isDebug:false);
+            return false;
+        }
+        
+        HasteAP.PrintBothDebug($"AP checking status of {locationName}");
+        long locationID = session.Locations.GetLocationIdFromName(game, locationName);
+        if (locationID != -1)
+        {
+            return session.Locations.AllLocationsChecked.Contains(locationID);
+        }
+        else
+        {
+            HasteAP.PrintBothDebug($"No locationID for name: {locationName}", isError:true, isDebug:false, duration: 15f);
+            return false;
+        }
+    }
+
     public void Close()
     {
         UnityMainThreadDispatcher.Instance().log("AP Disconnecting");
@@ -715,6 +743,7 @@ public class Connection(string hostname, int port)
         session.MessageLog.OnMessageReceived -= BuildMessageReceiver;
         session.Socket.ErrorReceived -= BuildErrorHandler;
         session.Socket.PacketReceived -= BuildPacketHandler;
+        session = null;
     }
     
     public void BuildItemReceiver(ReceivedItemsHelper rih)
